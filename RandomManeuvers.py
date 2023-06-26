@@ -1,8 +1,3 @@
-'''
-TODO:
-Figure out how V2V messages are sent
-'''
-
 import os
 import random
 import sys
