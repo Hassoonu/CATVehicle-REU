@@ -123,45 +123,7 @@ def braking_attack(plexe, message, vid):
         message.posX += message.speed * t + message.acceleration / 2 * t * t
     message.timestamp = newTime
 
-def desired_acceleration(plexe, v1, v2):
-    '''
-    :param v1: Verifying Vehicle
-    :param v2: Claiming Vehicle
-
-    un = K1 * s∆ + K2 * ∆v * R(s), if s <= rFRACC
-         K1 * (v0 - vn) * td, if s > rFRACC
-
-    un: desired acceleration
-    s: forward space gap
-    K1, K2: control feedback coefficients
-    rFRACC: detection range of forward sensor
-    ∆v: relative speed wrt the preceding vehicle
-    s∆: spacing error given by:
-    s∆ = min{s - s0 - vn * td, (v0 - vn) * td}
-    s0: minimum space gap between vehicles at standstill
-    td: desired time gap
-    v0: free-flow mode velocity (desired velocity)
-    vn: longitudinal vehicle velocity
-    R(s): space gap-dependent velocity-error response for forward
-        collision avoidance
-    R(s) = 1 - [1 / (1 + Q * e^-(s / P))]
-    Q: aggressiveness coefficient
-    P: perception range coefficient based on detection range
-        of the forward sensors
-    '''
-    td = 1.2; s0 = 3; v0 = velocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
-    d1 = plexe.get_vehicle_data(v1); d2 = plexe.get_vehicle_data(v2)    # get vehicle info
-    s = d2.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
-    vn = d1.__getitem__(SPEED); vn2 = d2.__getitem__(SPEED) # vehicle speeds
-
-    del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
-    R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
-
-    des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
-    return des_acc
-
-
-def false_desired_acceleration(plexe, v1, v2_data):
+def desired_acceleration(plexe, v1, v2_data):
     '''
     :param v1: Verifying Vehicle
     :param v2_data: Attacker False VehicleData object
@@ -280,7 +242,8 @@ def main():
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -4)
         if step % 20 == 1 and step < 700:
             # check_safety(VERIFYING_VEHICLE, CLAIMING_VEHICLE)
-            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, CLAIMING_VEHICLE)
+            v2_data = plexe.get_vehicle_data(CLAIMING_VEHICLE)
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, v2_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
             print(f"Desired Acceleration = {des_acc}")
         if step == 700:
@@ -291,7 +254,7 @@ def main():
             false_vehicle_data = VehicleData()
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
                 false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-            des_acc = false_desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data)
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
             print(f"Desired Acceleration = {des_acc}")
         step += 1
