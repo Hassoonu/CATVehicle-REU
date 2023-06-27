@@ -6,13 +6,13 @@ Send V2V messages through controller
 import os
 import random
 import sys
-import traci, utils
+import traci
 from vehicle_message import VehicleMessage
-from plexe import Plexe, DRIVER, ACC, CACC, RPM, GEAR, RADAR_REL_SPEED, \
-    SPEED, RADAR_DISTANCE, ACCELERATION, TIME, U, INDEX
+from plexe import Plexe, ACC, SPEED, ACCELERATION, TIME
 from utils import *
 import matplotlib.pyplot as plt
 from vehicle_data import VehicleData
+from attacks import Attacks
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -86,10 +86,6 @@ def add_vehicles(plexe, n, real_engine=False):
         plexe.set_active_controller(vid, ACC)
         plexe.set_acc_headway_time(vid, ACC_HEADWAY)
         plexe.set_cc_desired_speed(vid, 30)
-        '''
-        if i > 0:
-            plexe.enable_auto_feed(vid, True, CLAIMING_VEHICLE, "v.%d" % (i-1))
-            plexe.set_cc_desired_speed(vid, 50)'''
 
 def build_message(plexe, vid):
     # builds a message with current data
@@ -107,21 +103,6 @@ def send_message(plexe, claim, verifier):
     fd = VehicleData(pos_x=claim.posX, pos_y=claim.posY, acceleration=claim.acceleration, \
                      speed=claim.speed, time=claim.timestamp)
     plexe.set_front_vehicle_data(verifier, fd)
-
-def braking_attack(plexe, message, vid):
-    '''
-    simulates the kinematics of a vehicle suddenly braking
-    # vid: attacker vehicle
-    '''
-    newTime = plexe.get_vehicle_data(vid).__getitem__(TIME)
-    t = (newTime - message.timestamp)
-    message.acceleration = -6
-    if message.speed <= 0:
-        message.speed = 0
-    else:
-        message.speed += message.acceleration * t
-        message.posX += message.speed * t + message.acceleration / 2 * t * t
-    message.timestamp = newTime
 
 def desired_acceleration(plexe, v1, v2_data):
     '''
@@ -160,52 +141,6 @@ def desired_acceleration(plexe, v1, v2_data):
     des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
     return des_acc
 
-def check_safety(v1, v2):
-    '''
-    v1: verifier vehicle
-    v2: claiming vehicle
-    '''
-    plexe = Plexe()
-    # Get distance from cars A and B
-    d1 = plexe.get_vehicle_data(v1)
-    d2 = plexe.get_vehicle_data(v2)
-    # print(f"Distance between = {abs(abs(d2 - d1) - LENGTH):.2f}")
-    dist_between = abs(abs(d2.__getitem__(POS_X) - d1.__getitem__(POS_X)) - LENGTH)
-
-    # Calculate stopping distance
-    max_deceleration = -8    # in m/s
-    '''
-    Stopping distance is the dist required to make a complete stop
-    '''
-    stopping_dist = d1.__getitem__(SPEED) * d1.__getitem__(SPEED) / (-2 * max_deceleration)
-    relative_acc = d2.__getitem__(ACCELERATION) - d1.__getitem__(ACCELERATION)
-
-    print(f"Distance between = {dist_between:.2f} Stopping dist = {stopping_dist:.2f} Speed = {d1.__getitem__(SPEED)} Relative Acc = {relative_acc}")
-
-    # check if there is relative acceleration between the two vehicles
-    if (dist_between <= stopping_dist and d2.__getitem__(ACCELERATION) < 0):
-        if (relative_acc < -2):
-            plexe.set_fixed_acceleration(v1, True, max_deceleration)
-            print("Braking")
-        elif (relative_acc < -1):
-            plexe.set_fixed_acceleration(v1, True, -1)
-            print("Slowing")
-    # # if distance is too close, increase distance
-    # elif (dist_between < stopping_dist):
-    #     plexe.set_fixed_acceleration(v1, True, -1)
-    #     print("Increasing distance")
-    else:
-        sp = d2.__getitem__(SPEED)
-        if (sp < velocity):
-            plexe.set_cc_desired_speed(v1, sp)
-        else:
-            plexe.set_cc_desired_speed(v1, velocity)
-            print("Set speed to cruising velocity")
-    return
-
-def defensive_action():
-    return
-
 def main():
     start_sumo("cfg/freeway.sumo.cfg", False)
     plexe = Plexe()
@@ -227,30 +162,26 @@ def main():
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
-            '''
-        if step % 10 == 1:
-            # simulate vehicle communication every 100 ms
-            # print(plexe.get_vehicle_data(CLAIMING_VEHICLE).__getitem__(ACCELERATION))
-            send_message(plexe, CLAIMING_VEHICLE, VERIFYING_VEHICLE) 
-            '''
-        # if step == 700:
+
+        # if step == 400:
         #     false_message = build_message(plexe, CLAIMING_VEHICLE)
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -8)
         # elif step == 1200:
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, 3)
         # elif step == 2000:
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -4)
-        if step % 20 == 1 and step < 700:
-            # check_safety(VERIFYING_VEHICLE, CLAIMING_VEHICLE)
+        if step % 20 == 1 and step < 400:
             v2_data = plexe.get_vehicle_data(CLAIMING_VEHICLE)
             des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, v2_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
             print(f"Desired Acceleration = {des_acc}")
-        if step == 700:
+        if step == 400:
             false_message = build_message(plexe, CLAIMING_VEHICLE)
-        if step % 20 == 1 and step > 700:
+            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -8)
+        if step % 20 == 1 and step > 400:
             # BEGIN ATTACK!!
-            braking_attack(plexe, false_message, CLAIMING_VEHICLE)
+            attack = Attacks()
+            attack.notBraking(plexe, false_message ,CLAIMING_VEHICLE)
             false_vehicle_data = VehicleData()
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
                 false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
