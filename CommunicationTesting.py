@@ -23,6 +23,8 @@ else:
 MAX_STEP = 3000
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
+attack = Attacks()
+
 
 # cruising speed
 velocity = 30
@@ -170,24 +172,23 @@ def main():
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, 3)
         # elif step == 2000:
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -4)
-        if step % 20 == 1 and step < 400:
+        if step % 20 == 1 and step < 200:
             v2_data = plexe.get_vehicle_data(CLAIMING_VEHICLE)
             des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, v2_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
             print(f"Desired Acceleration = {des_acc}")
-        if step == 400:
+        if step == 200:
             false_message = build_message(plexe, CLAIMING_VEHICLE)
-            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -8)
-        if step % 20 == 1 and step > 400:
+            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, 0)
+        if step % 20 == 1 and step > 200:
             # BEGIN ATTACK!!
-            attack = Attacks()
-            attack.notBraking(plexe, false_message ,CLAIMING_VEHICLE)
+            attack.teleportationAttack(plexe, false_message ,CLAIMING_VEHICLE, VERIFYING_VEHICLE)
             false_vehicle_data = VehicleData()
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
-                false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
+            false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
             des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
-            print(f"Desired Acceleration = {des_acc}")
+            print(f"Desired Acceleration = {des_acc:.2f}")
         step += 1
 
     traci.close()

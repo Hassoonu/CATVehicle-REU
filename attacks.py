@@ -76,8 +76,21 @@ class Attacks:
             falseMessage.posX += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
 
-    def teleportationAttack(self, plexe, falseMessage, claimerID):
-        pass
+    def teleportationAttack(self, plexe, falseMessage, claimerID, targetID):
+        newTime = plexe.get_vehicle_data(claimerID).__getitem__(TIME)
+        t = (newTime - falseMessage.timestamp)
+        falsePositionX = plexe.get_vehicle_data(targetID).__getitem__(POS_X) + 4
+        falsePositionY = plexe.get_vehicle_data(targetID).__getitem__(POS_Y)
+        falseMessage.posX = falsePositionX
+        falseMessage.posY = falsePositionY
+        falseMessage.speed  = plexe.get_vehicle_data(targetID).__getitem__(SPEED)
+        falseMessage.timestamp = newTime #why this?
+
+
+
+
+
+
 
     def falseLaneAttack(self, plexe, falseMessage, claimerID):
         pass
