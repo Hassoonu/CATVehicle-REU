@@ -193,6 +193,9 @@ def main():
         if step % 400 == 1:
             dist = plexe.get_vehicle_data(CLAIMING_VEHICLE).__getitem__(POS_X) - plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(POS_X)
             choose_behavior(plexe, CLAIMING_VEHICLE, dist)
+            ranAcc = random.randint(-15, 10)
+            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, ranAcc)
+            print(f"Random acceleration: = {ranAcc}")
         step += 1
 
     traci.close()
