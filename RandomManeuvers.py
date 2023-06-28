@@ -196,7 +196,6 @@ def main():
             ranAcc = random.randint(-15, 10)
             plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, ranAcc)
             print(f"Random acceleration: = {ranAcc}")
-
         step += 1
 
     traci.close()
