@@ -91,8 +91,13 @@ class Attacks:
         falseMessage.speed  = plexe.get_vehicle_data(targetID).__getitem__(SPEED)
         falseMessage.timestamp = newTime
 
-    def falseLaneAttack(self, plexe, falseMessage, claimerID, targetID):
-        pass
+    def falseLaneAttack(self, plexe, claimerID, targetID):
+        falseLane = int(traci.vehicle.getLaneID(claimerID)[-1]) + 1
+        falseLane = str(falseLane)
+        return falseLane
+
+
+        
 
     def mergerAttack(self, plexe, falseMessage, claimerID, targetID):
         claimerX = plexe.get_vehicle_data(claimerID).__getitem__(POS_X)

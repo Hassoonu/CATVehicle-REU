@@ -20,7 +20,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 2000
+MAX_STEP = 3000
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
@@ -87,7 +87,7 @@ def add_vehicles(plexe, n, real_engine=False):
         plexe.use_controller_acceleration(vid, False)
         plexe.set_active_controller(vid, ACC)
         plexe.set_acc_headway_time(vid, ACC_HEADWAY)
-        plexe.set_cc_desired_speed(vid, 30)
+        plexe.set_cc_desired_speed(vid, 20)
 
 def build_message(plexe, vid):
     # builds a message with current data
@@ -182,15 +182,15 @@ def main():
             false_message = build_message(plexe, CLAIMING_VEHICLE)
         if step % 20 == 1 and step > 200:
             # BEGIN ATTACK!!
-            attack.mergerAttack(plexe, false_message, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
-            print(f"Verifier accel. = {plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(ACCELERATION)}" )
             false_vehicle_data = VehicleData()
+            #attack.falseLaneAttack(plexe, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            print(f"Verifier accel. = {plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(ACCELERATION)}" )
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
             false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-            claim_lane = int(traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1])
+            claim_lane = int(traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1]) + 1
             claim_lane = str(claim_lane)
             # find acceleration based on false message
-            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, plexe.get_vehicle_data(CLAIMING_VEHICLE), claim_lane)
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data, attack.falseLaneAttack(plexe, CLAIMING_VEHICLE, VERIFYING_VEHICLE))
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
         step += 1
 
