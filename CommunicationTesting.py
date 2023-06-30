@@ -6,7 +6,7 @@ Send V2V messages through controller
 import os
 import random
 import sys
-import traci
+import traci, utils
 from vehicle_message import VehicleMessage
 from plexe import Plexe, ACC, SPEED, ACCELERATION, TIME
 from utils import *
@@ -20,7 +20,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 3000
+MAX_STEP = 2000
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
@@ -100,13 +100,7 @@ def build_message(plexe, vid):
     newMessage = VehicleMessage(posX, posY, speed, acceleration, timestamp)
     return newMessage
 
-def send_message(plexe, claim, verifier):
-    # Take info from message and broadcast to target vehicle
-    fd = VehicleData(pos_x=claim.posX, pos_y=claim.posY, acceleration=claim.acceleration, \
-                     speed=claim.speed, time=claim.timestamp)
-    plexe.set_front_vehicle_data(verifier, fd)
-
-def desired_acceleration(plexe, v1, v2_data):
+def desired_acceleration(plexe, v1, v2_data, v2_lane):
     '''
     :param v1: Verifying Vehicle
     :param v2_data: Attacker False VehicleData object
@@ -134,13 +128,19 @@ def desired_acceleration(plexe, v1, v2_data):
     '''
     td = 1.2; s0 = 3; v0 = velocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
     d1 = plexe.get_vehicle_data(v1); # get vehicle info
-    s = v2_data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
-    vn = d1.__getitem__(SPEED); vn2 = v2_data.__getitem__(SPEED) # vehicle speeds
 
+    # check if cars are in the same lane
+    if (traci.vehicle.getLaneID(v1)[-1] == v2_lane):
+        s = v2_data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
+        vn = d1.__getitem__(SPEED); vn2 = v2_data.__getitem__(SPEED) # vehicle speeds
+    else:
+        s = 100 # calculate space gap
+        vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
     del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
     R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
 
     des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
+    print(f"Desired accel: {des_acc}")
     return des_acc
 
 def main():
@@ -164,6 +164,7 @@ def main():
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
+            #plexe.set_fixed_lane(CLAIMING_VEHICLE, 1, False)
 
         # if step == 400:
         #     false_message = build_message(plexe, CLAIMING_VEHICLE)
@@ -174,21 +175,23 @@ def main():
         #     plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, -4)
         if step % 20 == 1 and step < 200:
             v2_data = plexe.get_vehicle_data(CLAIMING_VEHICLE)
-            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, v2_data)
+            claim_lane = traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1]
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, v2_data, claim_lane)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
-            print(f"Desired Acceleration = {des_acc}")
         if step == 200:
             false_message = build_message(plexe, CLAIMING_VEHICLE)
-            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, 0)
         if step % 20 == 1 and step > 200:
             # BEGIN ATTACK!!
-            attack.teleportationAttack(plexe, false_message ,CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            attack.mergerAttack(plexe, false_message, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            print(f"Verifier accel. = {plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(ACCELERATION)}" )
             false_vehicle_data = VehicleData()
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
             false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data)
+            claim_lane = int(traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1])
+            claim_lane = str(claim_lane)
+            # find acceleration based on false message
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, plexe.get_vehicle_data(CLAIMING_VEHICLE), claim_lane)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
-            print(f"Desired Acceleration = {des_acc:.2f}")
         step += 1
 
     traci.close()
@@ -196,4 +199,3 @@ def main():
 if __name__ == "__main__":
     main()
     plot_data()
-
