@@ -1,8 +1,3 @@
-'''
-TODO:
-Send V2V messages through controller
-'''
-
 import os
 import random
 import sys
