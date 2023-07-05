@@ -13,14 +13,14 @@ from utils import *
 import matplotlib.pyplot as plt
 from vehicle_data import VehicleData
 from attacks import Attacks
-
+from vehicles import Vehicles
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
     sys.path.append(tools)
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 3000
+MAX_STEP = 2500
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
@@ -78,16 +78,8 @@ def plot_data():
     plt.show()
 
 def add_vehicles(plexe, n, real_engine=False):
-    # add n vehicles
-    for i in range(n):
-        vid = "v.%d" % i
-        add_vehicle(plexe, vid, (n - i + 1) * (DISTANCE + LENGTH) / 2, 0, velocity)
-        plexe.set_fixed_lane(vid, 0, safe=False)
-        traci.vehicle.setSpeedMode(vid, 0)
-        plexe.use_controller_acceleration(vid, False)
-        plexe.set_active_controller(vid, ACC)
-        plexe.set_acc_headway_time(vid, ACC_HEADWAY)
-        plexe.set_cc_desired_speed(vid, 20)
+    global vehicles
+    vehicles = [Vehicles("v.%d"%i, (n - i + 1) * (DISTANCE + LENGTH) / 2, 0, velocity,plexe) for i in range(n)]
 
 def build_message(plexe, vid):
     # builds a message with current data
@@ -162,6 +154,7 @@ def main():
             add_vehicles(plexe, 2)
             traci.gui.trackVehicle("View #0", VERIFYING_VEHICLE)
             traci.gui.setZoom("View #0", 45000)
+            #traci.vehicle.setParameter(CLAIMING_VEHICLE,'laneChangeModel.lcAssertive', '400')
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
             #plexe.set_fixed_lane(CLAIMING_VEHICLE, 1, False)
@@ -183,14 +176,15 @@ def main():
         if step % 20 == 1 and step > 200:
             # BEGIN ATTACK!!
             false_vehicle_data = VehicleData()
-            #attack.falseLaneAttack(plexe, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            #attack.mergerAttack(plexe, false_message, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            vehicles[0].setAcceleration(10000)
             print(f"Verifier accel. = {plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(ACCELERATION)}" )
             false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
             false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-            claim_lane = int(traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1]) + 1
+            claim_lane = int(traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1])
             claim_lane = str(claim_lane)
             # find acceleration based on false message
-            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data, attack.falseLaneAttack(plexe, CLAIMING_VEHICLE, VERIFYING_VEHICLE))
+            des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data, claim_lane)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
         step += 1
 
