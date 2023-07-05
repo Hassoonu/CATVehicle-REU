@@ -167,8 +167,8 @@ def main():
     plexe = Plexe()
     traci.addStepListener(plexe)
     step = 0
-    # random.seed(2)
-    random.seed(3)
+    random.seed(2)
+    #random.seed(3)
     while running(False, step, max_step=MAX_STEP):
 
         traci.simulationStep()
@@ -193,9 +193,9 @@ def main():
         if step % 400 == 1:
             dist = plexe.get_vehicle_data(CLAIMING_VEHICLE).__getitem__(POS_X) - plexe.get_vehicle_data(VERIFYING_VEHICLE).__getitem__(POS_X)
             choose_behavior(plexe, CLAIMING_VEHICLE, dist)
-            ranAcc = random.randint(-15, 10)
-            plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, ranAcc)
-            print(f"Random acceleration: = {ranAcc}")
+            # ranAcc = random.randint(-15, 10)
+            # plexe.set_fixed_acceleration(CLAIMING_VEHICLE, True, ranAcc)
+            # print(f"Random acceleration: = {ranAcc}")
         step += 1
 
     traci.close()
