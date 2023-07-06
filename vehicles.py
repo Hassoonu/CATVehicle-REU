@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 from vehicle_data import VehicleData
 
 ACC_HEADWAY=1.5
+LENGTH = 4
+velocity = 30
+
+
 class Vehicles:
 
     def __init__(self, vehicleID, position, lane, speed, plexe):
@@ -26,30 +30,57 @@ class Vehicles:
 
 
     def getAcceleration(self):
-        pass
+        pass 
 
     def setAcceleration(self, acceleration):
         self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
         
 
     def getLane(self):
-        lane = traci.vehicle.getLaneID(self.id)[-1]
+        lane = traci.vehicle.getLaneID(self.ID)[-1]
         return lane
 
-    def buildFalseVehicle(self, falseVehicleObject, falseMessage):
-        falseVehicleObject.pos_x = falseMessage.posX
-        falseVehicleObject.pos_y = falseMessage.posY
-        falseVehicleObject.speed = falseMessage.speed
-        falseVehicleObject.acceleration = falseMessage.acceleration
+    def copyDataFromMessage(self, vehicleObject, message):
+        vehicleObject.pos_x = message.posX
+        vehicleObject.pos_y = message.posY
+        vehicleObject.speed = message.speed
+        vehicleObject.acceleration = message.acceleration
 
     def getDesiredAcceleration(self, vehicle1, vehicle2Data, vehicle2Lane):
+        
+        '''
+    :param v1: Verifying Vehicle
+    :param v2_data: Attacker False VehicleData object
+
+    un = K1 * s∆ + K2 * ∆v * R(s), if s <= rFRACC
+         K1 * (v0 - vn) * td, if s > rFRACC
+
+    un: desired acceleration
+    s: forward space gap
+    K1, K2: control feedback coefficients
+    rFRACC: detection range of forward sensor
+    ∆v: relative speed wrt the preceding vehicle
+    s∆: spacing error given by:
+    s∆ = min{s - s0 - vn * td, (v0 - vn) * td}
+    s0: minimum space gap between vehicles at standstill
+    td: desired time gap
+    v0: free-flow mode velocity (desired velocity)
+    vn: longitudinal vehicle velocity
+    R(s): space gap-dependent velocity-error response for forward
+        collision avoidance
+    R(s) = 1 - [1 / (1 + Q * e^-(s / P))]
+    Q: aggressiveness coefficient
+    P: perception range coefficient based on detection range
+        of the forward sensors
+    '''
+
         cruisingVelocity = 30
         td = 1.2; s0 = 3; v0 = cruisingVelocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
         d1 = self.plexe.get_vehicle_data(vehicle1); # get vehicle info
         
-        if (vehicle1.getLane() == v2_lane):
-            s = v2_data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
-            vn = d1.__getitem__(SPEED); vn2 = v2_data.__getitem__(SPEED) # vehicle speeds
+        if (self.getLane() == vehicle2Lane):
+            s = vehicle2Data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
+            vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
@@ -63,8 +94,8 @@ class Vehicles:
     def getVehicleData(self, ):
         pass
 
-    def buildMessage(self, vehicleID):
-        vd = self.plexe.get_vehicle_data(vehicleID)
+    def buildMessage(self):
+        vd = self.plexe.get_vehicle_data(self.ID)
         posX = vd.__getitem__(POS_X)
         posY = vd.__getitem__(POS_Y)
         acceleration = vd.__getitem__(ACCELERATION)

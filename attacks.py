@@ -60,8 +60,8 @@ class Attacks:
             falseMessage.speed += falseMessage.acceleration * t
             falseMessage.posX += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
-        #print(falseMessage.acceleration)
         plexe.set_fixed_acceleration(claimerID, True, 0)
+
 
     def notBraking(self, plexe, falseMessage, claimerID):
         '''
@@ -79,6 +79,7 @@ class Attacks:
         falseMessage.timestamp = newTime
         plexe.set_fixed_acceleration(claimerID, True, -6)
 
+
     def teleportationAttack(self, plexe, falseMessage, claimerID, targetID):
         newTime = plexe.get_vehicle_data(claimerID).__getitem__(TIME)
         t = (newTime - falseMessage.timestamp)
@@ -93,18 +94,19 @@ class Attacks:
         falseLane = int(traci.vehicle.getLaneID(claimerID)[-1]) + 1
         falseLane = str(falseLane)
         return falseLane
-  
-#have attack run on bool, ex: "function(lane = default if not condition else attack)"
+
+
+        
 
     def mergerAttack(self, plexe, falseMessage, claimerID, targetID):
         claimerX = plexe.get_vehicle_data(claimerID).__getitem__(POS_X)
         targetX = plexe.get_vehicle_data(targetID).__getitem__(POS_X)
         distance = claimerX - targetX
-        distanceThreshold = 2
+        distanceThreshold = 3
         targetSpeed = plexe.get_vehicle_data(targetID).__getitem__(SPEED)
         #Declare Variables
         
-        td = 0; s0 = 0; v0 = targetSpeed; Q = 1; P = 100; K1 = 0.13 ; K2 = 1.93     # params k1 = 0.13, k2 = 1.93
+        td = 0; s0 = 0; v0 = targetSpeed; Q = 1; P = 100; K1 = 0.18 ; K2 = 1.93     # params k1 = 0.18, k2 = 1.93
         d1 = plexe.get_vehicle_data(claimerID); # get vehicle info
         s = distance # calculate space gap
         vn = d1.__getitem__(SPEED); vn2 = targetSpeed # vehicle speeds      
@@ -126,10 +128,10 @@ class Attacks:
         #merge attack variable declarations
 
         if( (distance < distanceThreshold) and ( speedDiff < speedThreshold)):
-            plexe.set_fixed_lane(claimerID, 0, safe=False) #NOT FINISHED, LINE PRODUCES ERROR + NOT MERGING?!?!?!?
-            print("Im working")
-            print(f"ClaimerSpeed: {claimerSpeed}\nTargetSpeed: {targetSpeed}")
+            plexe.set_fixed_lane(claimerID, 0, False) #NOT FINISHED, LINE PRODUCES ERROR + NOT MERGING?!?!?!?
+            print("Im working lmao")
         #Meant to merge lanes and cause crash
+
         
     def rearAttack(self, plexe, falseMessage, claimerID, targetID):
 
