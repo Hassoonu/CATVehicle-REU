@@ -8,6 +8,7 @@ from plexe import Plexe, DRIVER, ACC, CACC, RPM, GEAR, RADAR_REL_SPEED, \
 from utils import *
 import matplotlib.pyplot as plt
 from vehicle_data import VehicleData
+import json
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -15,7 +16,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 6000
+MAX_STEP = 2000
 # Vehicle IDs
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
@@ -104,7 +105,7 @@ def choose_behavior(plexe, vid, dist_between):
     action = random.randint(0, 3)
     if (action == 0):
         # Change lane
-        new_lane = random.randint(0, 3)
+        new_lane = 0 # random.randint(0, 3)
         print(f"changing to lane {new_lane}")
         plexe.set_fixed_lane(vid, new_lane, False)
     elif (action == 1 or dist_between < -20):
@@ -167,24 +168,23 @@ def main():
     plexe = Plexe()
     traci.addStepListener(plexe)
     step = 0
-    random.seed(2)
-    #random.seed(3)
+    #random.seed(2)
+    random.seed(5)
     while running(False, step, max_step=MAX_STEP):
 
         traci.simulationStep()
-        if step > 1:
-            time = traci.simulation.getTime()
-            for vid in vehicle_ids:
-                data[vid]["times"].append(time)
-                data[vid]["accelerations"].append(traci.vehicle.getAcceleration(vid))
-                data[vid]["velocities"].append(traci.vehicle.getSpeed(vid))
-        elif step == 0:
+        if step == 0:
             add_vehicles(plexe, 2)
             traci.gui.trackVehicle("View #0", VERIFYING_VEHICLE)
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
         if step % 20 == 1:
+            time = traci.simulation.getTime()
+            for vid in vehicle_ids:
+                data[vid]["times"].append(time)
+                data[vid]["accelerations"].append(traci.vehicle.getAcceleration(vid))
+                data[vid]["velocities"].append(traci.vehicle.getSpeed(vid))
             v2_data = plexe.get_vehicle_data(CLAIMING_VEHICLE)
             des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, CLAIMING_VEHICLE, v2_data)
             plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
@@ -203,4 +203,5 @@ def main():
 if __name__ == "__main__":
     main()
     plot_data()
-
+    with open(f'vehicle_data.json', 'w') as f:
+        json.dump(data, f)

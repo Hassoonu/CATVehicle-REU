@@ -69,7 +69,7 @@ def main(Q):
             prediction += Q  # predict the error
 
             # update
-            kalman_gain = prediction / (prediction + R)  # calculate Kalman Gain
+            kalman_gain = prediction / (prediction + R)  # calculate Kalman Gain: (0 to 1)
             state_est += (kalman_gain * (curr_point - state_est))  # Update the state value
             prediction *= (1 - kalman_gain)  # update the error
 
