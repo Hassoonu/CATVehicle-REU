@@ -1,13 +1,8 @@
-import os
-import random
-import sys
-import traci, utils
+import traci
 from vehicle_message import VehicleMessage
-from plexe import Plexe, DRIVER, ACC, CACC, RPM, GEAR, RADAR_REL_SPEED, \
-    SPEED, RADAR_DISTANCE, ACCELERATION, TIME, U, INDEX
+from plexe import ACC, SPEED, ACCELERATION, TIME
 from utils import *
-import matplotlib.pyplot as plt
-from vehicle_data import VehicleData
+from Sensors import addNoise, kalmanFilter
 
 ACC_HEADWAY=1.5
 LENGTH = 4
@@ -46,7 +41,7 @@ class Vehicles:
         vehicleObject.speed = message.speed
         vehicleObject.acceleration = message.acceleration
 
-    def getDesiredAcceleration(self, vehicle1, vehicle2Data, vehicle2Lane):
+    def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane):
         
         '''
     :param v1: Verifying Vehicle
@@ -76,7 +71,7 @@ class Vehicles:
 
         cruisingVelocity = 30
         td = 1.2; s0 = 3; v0 = cruisingVelocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
-        d1 = self.plexe.get_vehicle_data(vehicle1); # get vehicle info
+        d1 = self.plexe.get_vehicle_data(self.ID); # get vehicle info
         
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
@@ -91,7 +86,7 @@ class Vehicles:
         print(f"Desired accel: {des_acc}")
         return des_acc
 
-    def getVehicleData(self, ):
+    def getSensorData(self, ):
         pass
 
     def buildMessage(self):
@@ -103,5 +98,8 @@ class Vehicles:
         timestamp = vd.__getitem__(TIME)
         newMessage = VehicleMessage(posX, posY, speed, acceleration, timestamp)
         return newMessage
+    
+    def getID(self):
+        return self.ID
 
 

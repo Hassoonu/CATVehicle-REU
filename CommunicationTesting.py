@@ -73,15 +73,6 @@ def add_vehicles(plexe, n, real_engine=False):
     # add n vehicles
     global vehicles
     vehicles = [Vehicles("v.%d"%i, (n - i + 1) * (DISTANCE + LENGTH) / 2, 0, velocity,plexe) for i in range(n)]
-    for i in range(n):
-        vid = "v.%d" % i
-        add_vehicle(plexe, vid, (n - i + 1) * (DISTANCE + LENGTH) / 2, 0, velocity)
-        plexe.set_fixed_lane(vid, 0, safe=False)
-        traci.vehicle.setSpeedMode(vid, 0)
-        plexe.use_controller_acceleration(vid, False)
-        plexe.set_active_controller(vid, ACC)
-        plexe.set_acc_headway_time(vid, ACC_HEADWAY)
-        plexe.set_cc_desired_speed(vid, 30)
 
 def main():
     start_sumo("cfg/freeway.sumo.cfg", False)
@@ -115,6 +106,7 @@ def main():
             desiredAcceleration = vehicles[1].getDesiredAcceleration(VERIFYING_VEHICLE, v2_data, claim_lane)
             vehicles[1].setAcceleration(desiredAcceleration)
             print(f"Desired Acceleration = {desiredAcceleration}")
+        
         if step == 200:
 
             false_message = vehicles[0].buildMessage()
@@ -132,7 +124,6 @@ def main():
             vehicles[1].setAcceleration(desiredAcceleration)
             
             print(f"Desired Acceleration = {desiredAcceleration:.2f}")
-            
         step += 1
 
     traci.close()
