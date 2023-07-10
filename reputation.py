@@ -8,22 +8,22 @@ class Reputation:
         '''
         return True
     def UpdateTrustScore(self, sensorData, message):
-        threshold = 0.5
+        threshold = 1
         suspicious = False
         if (sensorData.acceleration - message.acceleration) > threshold:
-            self.trust -= abs(message.acceleration - threshold)
+            self.trust -= abs(message.acceleration - threshold) / 100
             suspicious = True
         if (sensorData.speed - message.speed) > threshold:
-            self.trust -= abs(message.speed - threshold)
+            self.trust -= abs(message.speed - threshold) / 100
             suspicious = True
-        if (sensorData.posY - message.posY) > threshold:
-            self.trust -= abs(message.posY - threshold)
+        if (sensorData.pos_y - message.pos_y) > threshold:
+            self.trust -= abs(message.pos_y - threshold) / 100
             suspicious = True
-        if (sensorData.posX - message.posX) > threshold:
-            self.trust -= abs(message.posX - threshold)
+        if (sensorData.pos_x - message.pos_x) > threshold:
+            self.trust -= abs(message.pos_x - threshold) / 100
             suspicious = True
         if not suspicious:
-            self.trust += .02
+            self.trust += .005
             
         # boundary conditions
         if self.trust > 1:

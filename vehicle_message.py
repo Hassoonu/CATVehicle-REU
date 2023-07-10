@@ -3,18 +3,18 @@ Message class for the V2V communication
 '''
 
 class VehicleMessage():
-    def __init__(self, posX = 0, posY = 0, speed = 0, acceleration = 0, timestamp = 0):
-        self.posX = posX
-        self.posY = posY
+    def __init__(self, pos_x = 0, pos_y = 0, speed = 0, acceleration = 0, timestamp = 0):
+        self.pos_x = pos_x
+        self.pos_y = pos_y
         self.speed = speed
         self.acceleration = acceleration
         self.timestamp = timestamp
     
     def get(self, item):
-        if item == 'posX':
-            return self.posX
-        elif item == 'posY':
-            return self.posY
+        if item == 'pos_x':
+            return self.pos_x
+        elif item == 'pos_y':
+            return self.pos_y
         elif item == 'speed':
             return self.speed
         elif item == 'acceleration':
