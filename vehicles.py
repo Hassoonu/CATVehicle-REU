@@ -43,7 +43,8 @@ class Vehicles:
 
     def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane):
         
-        '''
+        '''             #note: have trust decide distance in get desired accel.
+
     :param v1: Verifying Vehicle
     :param v2_data: Attacker False VehicleData object
 
@@ -68,6 +69,8 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
+        #use trust score to determine td
+        
 
         cruisingVelocity = 30
         td = 1.2; s0 = 3; v0 = cruisingVelocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
@@ -86,8 +89,61 @@ class Vehicles:
         print(f"Desired accel: {des_acc}")
         return des_acc
 
-    def getSensorData(self, ):
-        pass
+    def getSensorData(self, claimedAcceleration, claimedVelocity, claimedPosition, claimedLane):
+        sensorAcceleration = claimedAcceleration
+        sensorVelocity = claimedVelocity
+        sensorPosition = claimedPosition
+
+        goodAcceleration = self.getDesiredAcceleration(sensorAcceleration, sensorVelocity, sensorPosition, claimedLane)
+        self.setAcceleration(goodAcceleration)
+        
+    def getDesiredAcceleration(self, otherVehicleAccleration, otherVehicleVelocity, otherVehiclePosition, vehicle2Lane):
+        
+        '''             #note: have trust decide distance in get desired accel.
+
+    :param v1: Verifying Vehicle
+    :param v2_data: Attacker False VehicleData object
+
+    un = K1 * s∆ + K2 * ∆v * R(s), if s <= rFRACC
+         K1 * (v0 - vn) * td, if s > rFRACC
+
+    un: desired acceleration
+    s: forward space gap
+    K1, K2: control feedback coefficients
+    rFRACC: detection range of forward sensor
+    ∆v: relative speed wrt the preceding vehicle
+    s∆: spacing error given by:
+    s∆ = min{s - s0 - vn * td, (v0 - vn) * td}
+    s0: minimum space gap between vehicles at standstill
+    td: desired time gap
+    v0: free-flow mode velocity (desired velocity)
+    vn: longitudinal vehicle velocity
+    R(s): space gap-dependent velocity-error response for forward
+        collision avoidance
+    R(s) = 1 - [1 / (1 + Q * e^-(s / P))]
+    Q: aggressiveness coefficient
+    P: perception range coefficient based on detection range
+        of the forward sensors
+    '''
+        #use trust score to determine td
+        
+
+        cruisingVelocity = 30
+        td = 1.2; s0 = 3; v0 = cruisingVelocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
+        d1 = self.plexe.get_vehicle_data(self.ID); # get vehicle info
+        
+        if (self.getLane() == vehicle2Lane):
+            s = otherVehiclePosition - d1.__getitem__(POS_X) - LENGTH # calculate space gap
+            vn = d1.__getitem__(SPEED); vn2 = otherVehicleVelocity # vehicle speeds
+        else:
+            s = 100 # calculate space gap
+            vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
+        del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
+        R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
+
+        des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
+        print(f"Desired accel: {des_acc}")
+        return des_acc
 
     def buildMessage(self):
         vd = self.plexe.get_vehicle_data(self.ID)

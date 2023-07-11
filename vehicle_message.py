@@ -21,4 +21,3 @@ class VehicleMessage():
             return self.acceleration
         elif item == 'timestamp':
             return self.timestamp
-        

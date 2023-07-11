@@ -136,6 +136,11 @@ def main():
             sensor_info = plexe.get_vehicle_data(CLAIMING_VEHICLE)
             v2_data = vehicles[0].buildMessage()
 
+            claim_position_sensor = addNoise(traci.vehicle.getPosition(CLAIMING_VEHICLE), 0.4)
+            estimatedPosition, predictedPositionError = kalmanFilter(claim_position_sensor, state_est = estimatedPosition, prediction=predictedPositionError)
+
+
+
             # calculate acceleration
             accel = (estimatedVelocity - prev_est) / (SENSOR_REFRESH / 100)
             sensor_info.speed = estimatedVelocity
@@ -144,10 +149,9 @@ def main():
             sensor_info.acceleration = accel_est
 
             claim_lane = vehicles[0].getLane()
-            print(f"The lane is: {claim_lane}")
             desiredAcceleration = vehicles[1].getDesiredAcceleration(sensor_info, claim_lane)
             vehicles[1].setAcceleration(desiredAcceleration)
-            # print(f"Desired Acceleration = {des_acc:.2f}")
+            #vehicles[1].getSensorData(claim_), claimedPosition=, claimed)
 
             trust_score.UpdateTrustScore(sensor_info, v2_data)
 
