@@ -1,3 +1,5 @@
+import math
+
 class Reputation:
     def __init__(self, trust = 0.5):
         self.trust = trust
@@ -7,24 +9,43 @@ class Reputation:
         Returns whether the message is trustworthy
         '''
         return True
-    def UpdateTrustScore(self, sensorData, message):
+    def decay(self, interval):
+        '''
+        Adds exponential time decay based on the length of the intervals between messages
+        '''
+        decay_rate = .001
+        self.trust *= math.exp(-decay_rate * interval)
+        return
+    def increase(self, inc):
+        '''
+        Increases the trust score based on a factor
+        '''
+        increase_factor = .1
+        self.trust += increase_factor * math.log(1 + inc)
+        return
+    def UpdateTrustScore(self, sensorData, message, time_interval):
         threshold = 1
         suspicious = False
-        if (sensorData.acceleration - message.acceleration) > threshold:
-            self.trust -= abs(message.acceleration - threshold) / 100
+        deviation = 0
+        if abs(sensorData.acceleration - message.acceleration) > 2:
             suspicious = True
-        if (sensorData.speed - message.speed) > threshold:
-            self.trust -= abs(message.speed - threshold) / 100
+            deviation += abs(sensorData.acceleration - message.acceleration) - 2
+        if abs(sensorData.speed - message.speed) > threshold:
             suspicious = True
-        if (sensorData.pos_y - message.pos_y) > threshold:
-            self.trust -= abs(message.pos_y - threshold) / 100
-            suspicious = True
-        if (sensorData.pos_x - message.pos_x) > threshold:
-            self.trust -= abs(message.pos_x - threshold) / 100
-            suspicious = True
-        if not suspicious:
-            self.trust += .005
-            
+            deviation += abs(sensorData.speed - message.speed) - threshold
+        # if abs(sensorData.pos_y - message.pos_y) > threshold:
+        #     suspicious = True
+        #     deviation += abs(sensorData.pos_y - message.pos_y) - threshold
+        # if abs(sensorData.pos_x - message.pos_x) > threshold:
+        #     deviation += abs(sensorData.pos_x - message.pos_x) - threshold
+        #     suspicious = True
+    
+        self.decay(time_interval)
+
+        if suspicious:
+            self.trust -= deviation / 100
+        else:
+            self.increase(.01)
         # boundary conditions
         if self.trust > 1:
             self.trust = 1
