@@ -18,11 +18,11 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 1500
+MAX_STEP = 2000
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 900
+ATTACK_STEP = 1500
 
 # cruising speed
 velocity = 30
@@ -55,14 +55,14 @@ def plot_data():
             name = "Claimer"
         else:
             name = "Verifier"
-        axs[0, 0].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Acceleration")
+        axs[1, 1].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Acceleration")
     
     # axs[0, 0].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accl")
 
-    axs[0, 0].set_xlabel('Time (s)')
-    axs[0, 0].set_ylabel('Acceleration (m/s^2)')
-    axs[0, 0].set_title('Vehicle Acceleration')
-    axs[0, 0].legend()  # add a legend to distinguish the different vehicles
+    axs[1, 1].set_xlabel('Time (s)')
+    axs[1, 1].set_ylabel('Acceleration (m/s^2)')
+    axs[1, 1].set_title('Vehicle Acceleration')
+    axs[1, 1].legend()  # add a legend to distinguish the different vehicles
 
     # plot the velocity data for each vehicle
     for vid in vehicle_ids:
@@ -93,12 +93,13 @@ def plot_data():
     axs[1, 0].set_title('Trust Score')
 
     # plot the message information
-    axs[1, 1].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity")
+    axs[0, 0].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity")
     # axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel")
-    axs[1, 1].set_xlabel('Time (s)')
-    axs[1, 1].set_ylabel('Message Information')
-    axs[1, 1].set_title('Messages')
-    axs[1, 1].legend()  # add a legend to distinguish the different vehicles
+    axs[0, 0].set_xlabel('Time (s)')
+    axs[0, 0].set_ylabel('Message Information')
+    axs[0, 0].set_title('Messages')
+    axs[0, 0].legend()  # add a legend to distinguish the different vehicles
+    axs[0, 0].set_ylim(axs[0, 1].get_ylim())
 
     # plot the acceleration sensor information
     axs[1, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["accelerations"], label=f"{name} Accel")
@@ -106,7 +107,7 @@ def plot_data():
     axs[1, 2].plot(sensor_data["times"], sensor_data["filtered_accelerations"], label=f"Filtered Accel")
     axs[1, 2].set_xlabel('Time (s)')
     axs[1, 2].set_ylabel('Speed (m/s)')
-    axs[1, 2].set_title('Vehicle Acceleration')
+    axs[1, 2].set_title('Sensor Acceleration')
     axs[1, 2].legend()  # add a legend to distinguish the different vehicles
     plt.tight_layout()  # adjust the subplot layout to make it more readable
     plt.show()
@@ -202,9 +203,17 @@ def main():
                 sensor_data["message_acceleration"].append(vehicles[0].getAcceleration())
                 sensor_data["message_speed"].append(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
 
-        if step == 600:
-            vehicles[0].setAcceleration(1)
-        if step == 900:
+        if step == 200:
+            vehicles[0].setAcceleration(-3)
+        if step == 400:
+            vehicles[0].setAcceleration(6)
+        if step == 1000:
+            vehicles[0].setAcceleration(-1)
+        # if step == 1400:
+        #     vehicles[0].setAcceleration(-6)
+        # if step == 2000:
+        #     vehicles[0].setAcceleration(6)
+        if step == ATTACK_STEP:
             vehicles[0].setAcceleration(0)
             false_message = vehicles[0].buildMessage()
         step += 1
