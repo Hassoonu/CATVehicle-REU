@@ -22,3 +22,15 @@ class VehicleMessage():
         elif item == 'timestamp':
             return self.timestamp
         
+    def __getitem__(self, item):
+        if item == 'pos_x':
+            return self.pos_x
+        elif item == 'pos_y':
+            return self.pos_y
+        elif item == 'speed':
+            return self.speed
+        elif item == 'acceleration':
+            return self.acceleration
+        elif item == 'timestamp':
+            return self.timestamp
+        
