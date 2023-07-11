@@ -18,11 +18,11 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 3000
+MAX_STEP = 1500
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-
+ATTACK_STEP = 900
 
 # cruising speed
 velocity = 30
@@ -37,12 +37,13 @@ DISTANCE = ACC_HEADWAY * velocity + 2
 # falsified message
 false_message = VehicleMessage()
 trust_score = Reputation(0.5)
+trust_threshold = 0.4
 
-# variables for plotting
+# plotting information
 vehicle_ids = [CLAIMING_VEHICLE, VERIFYING_VEHICLE]
 data = {vid: {"times": [], "accelerations": [], "velocities": []} for vid in vehicle_ids}
 sensor_data = {"times": [], "sensor_velocities": [], "filtered_velocities": [], "sensor_accelerations": [], \
-               "filtered_accelerations": []}
+               "filtered_accelerations": [], "message_speed": [], "message_acceleration": []}
 trust_data = {"times": [], "trust": []}
 
 def plot_data():
@@ -76,20 +77,30 @@ def plot_data():
     axs[0, 1].set_title('Vehicle Speed')
     axs[0, 1].legend()  # add a legend to distinguish the different vehicles
 
+    # plot the velocity sensor information
+    axs[0, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["velocities"], label=f"{name} Velocity")
+    axs[0, 2].plot(sensor_data["times"], sensor_data["sensor_velocities"], label=f"Sensor Velocity")
+    axs[0, 2].plot(sensor_data["times"], sensor_data["filtered_velocities"], label=f"Filtered Velocity")
+    axs[0, 2].set_xlabel('Time (s)')
+    axs[0, 2].set_ylabel('Speed (m/s)')
+    axs[0, 2].set_title('Sensor Speed')
+    axs[0, 2].legend()  # add a legend to distinguish the different vehicles
+
     # plot the trust data
     axs[1, 0].plot(trust_data["times"], trust_data["trust"], label=f"Trust Score")
     axs[1, 0].set_xlabel('Time')
     axs[1, 0].set_ylabel('Trust')
     axs[1, 0].set_title('Trust Score')
 
-    axs[0, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["velocities"], label=f"{name} Velocity")
-    axs[0, 2].plot(sensor_data["times"], sensor_data["sensor_velocities"], label=f"Sensor Velocity")
-    axs[0, 2].plot(sensor_data["times"], sensor_data["filtered_velocities"], label=f"Filtered Velocity")
-    axs[0, 2].set_xlabel('Time (s)')
-    axs[0, 2].set_ylabel('Speed (m/s)')
-    axs[0, 2].set_title('Vehicle Speed')
-    axs[0, 2].legend()  # add a legend to distinguish the different vehicles
+    # plot the message information
+    axs[1, 1].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity")
+    # axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel")
+    axs[1, 1].set_xlabel('Time (s)')
+    axs[1, 1].set_ylabel('Message Information')
+    axs[1, 1].set_title('Messages')
+    axs[1, 1].legend()  # add a legend to distinguish the different vehicles
 
+    # plot the acceleration sensor information
     axs[1, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["accelerations"], label=f"{name} Accel")
     axs[1, 2].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accel")
     axs[1, 2].plot(sensor_data["times"], sensor_data["filtered_accelerations"], label=f"Filtered Accel")
@@ -133,7 +144,7 @@ def main():
                 prev_est = estimatedVelocity
             claim_speed_sensor = addNoise(traci.vehicle.getSpeed(CLAIMING_VEHICLE), 0.4)
             estimatedVelocity, pred = kalmanFilter(claim_speed_sensor, state_est=estimatedVelocity, prediction=pred)
-            sensor_info = plexe.get_vehicle_data(CLAIMING_VEHICLE)
+            sensor_info = vehicles[0].buildMessage()
             v2_data = vehicles[0].buildMessage()
 
             # calculate acceleration
@@ -143,13 +154,34 @@ def main():
             accel_est, accel_pred = kalmanFilter(accel, R=1, state_est=accel_est, prediction=accel_pred)
             sensor_info.acceleration = accel_est
 
-            claim_lane = vehicles[0].getLane()
-            print(f"The lane is: {claim_lane}")
-            desiredAcceleration = vehicles[1].getDesiredAcceleration(sensor_info, claim_lane)
-            vehicles[1].setAcceleration(desiredAcceleration)
-            # print(f"Desired Acceleration = {des_acc:.2f}")
+            # start attack
+            if step > ATTACK_STEP:
+                attack.falseBrake(plexe, false_message, CLAIMING_VEHICLE)
 
-            trust_score.UpdateTrustScore(sensor_info, v2_data)
+                false_vehicle_data = VehicleData()
+                false_vehicle_data.pos_x = false_message.pos_x; false_vehicle_data.pos_y = false_message.pos_y; \
+                false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
+
+                trust_score.UpdateTrustScore(sensor_info, false_vehicle_data, SENSOR_REFRESH / 100)
+            else:
+                # sensor info needs to be VehicleData object
+                sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
+                                                pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
+                claim_lane = vehicles[0].getLane()
+                trust_score.UpdateTrustScore(sensor_info, v2_data, SENSOR_REFRESH / 100)
+
+            # check if trust score is too low
+            if trust_score.trust < trust_threshold:
+                # ignore message, only use sensor information
+                sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
+                                            pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
+                des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane)
+            else:
+                if step > ATTACK_STEP:
+                    des_acc = vehicles[1].getDesiredAcceleration(false_vehicle_data, claim_lane)
+                else:
+                    des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane)
+            vehicles[1].setAcceleration(des_acc)
 
             # graphing info
             for vid in vehicle_ids:
@@ -160,29 +192,21 @@ def main():
             trust_data["trust"].append(trust_score.trust)
             sensor_data["times"].append(time)
             sensor_data["sensor_velocities"].append(claim_speed_sensor)
-            sensor_data["filtered_velocities"].append(estimatedVelocity)
+            sensor_data["filtered_velocities"].append(sensor_info.speed)
             sensor_data["sensor_accelerations"].append(accel)
             sensor_data["filtered_accelerations"].append(sensor_info.acceleration)
+            if step > ATTACK_STEP:
+                sensor_data["message_acceleration"].append(false_vehicle_data.acceleration)
+                sensor_data["message_speed"].append(false_vehicle_data.speed)
+            else:
+                sensor_data["message_acceleration"].append(vehicles[0].getAcceleration())
+                sensor_data["message_speed"].append(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
+
         if step == 600:
-            false_message = vehicles[0].buildMessage()
             vehicles[0].setAcceleration(1)
         if step == 900:
-            vehicles[0].setAcceleration(-4)
-        if step == 1100:
-            vehicles[0].setAcceleration(1)
-        if step == 1300:
-            vehicles[0].setAcceleration(0.1)
-        if step == 1700:
-            vehicles[0].setAcceleration(-6)
-        # if step > 200 and step % SENSOR_REFRESH == 1:
-        #     sensor_info = build_message(plexe, CLAIMING_VEHICLE)
-        #     attack.falseBrake(plexe, false_message, CLAIMING_VEHICLE)
-        #     false_vehicle_data = VehicleData()
-        #     false_vehicle_data.pos_x = false_message.posX; false_vehicle_data.pos_y = false_message.posY; \
-        #     false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-        #     claim_lane = traci.vehicle.getLaneID(CLAIMING_VEHICLE)[-1]
-        #     des_acc = desired_acceleration(plexe, VERIFYING_VEHICLE, false_vehicle_data, claim_lane)
-        #     plexe.set_fixed_acceleration(VERIFYING_VEHICLE, True, des_acc)
+            vehicles[0].setAcceleration(0)
+            false_message = vehicles[0].buildMessage()
         step += 1
 
     traci.close()
