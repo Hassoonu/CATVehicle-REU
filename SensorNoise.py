@@ -55,26 +55,25 @@ def optimizeAccel():
     plt.figure(figsize=(7, 5))
     # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='gray')
     # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations_noisy'], label='Noisy Data', linestyle='dashed')
-    plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='red')
     plt.plot(sensor_data['times'], sensor_data['sensor_accelerations'], label='Noise', color='gray')
+    plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='black')
 
     # plot the different optimized kalman filters
     n = len(sensor_data['times']) # number of data points
-    for iteration in range(0, 2):
-        est_buffer = np.zeros(n)
-        data_buffer = np.zeros(n)
-        R = math.pow(1, iteration); Q = 0.1
-        R, Q = optimize_parameters(sensor_data['sensor_accelerations'], data[target_vid]['accelerations'], R, Q)
-        print(f"R = {R:.3f}, Q = {Q:.3f}, R / Q = {(R / Q):.3f}")
+    est_buffer = np.zeros(n)
+    data_buffer = np.zeros(n)
+    R = 1; Q = 0.1
+    R, Q = optimize_parameters(sensor_data['sensor_accelerations'], data[target_vid]['accelerations'], R, Q)
+    print(f"R = {R:.3f}, Q = {Q:.3f}, R / Q = {(R / Q):.3f}")
 
-        # reinitialize state_est and prediction
-        state_est = 0
-        prediction = 0
-        est_buffer = kalman_filter(sensor_data['sensor_accelerations'], R, Q, state_est=state_est, prediction=prediction)
-        
-        # # add filtered data to dataset
-        data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
-        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [Q = {Q:.2f}, R = {R:.2f}]', linestyle='dotted')
+    # reinitialize state_est and prediction
+    state_est = 0
+    prediction = 0
+    est_buffer = kalman_filter(sensor_data['sensor_accelerations'], R, Q, state_est=state_est, prediction=prediction)
+    
+    # # add filtered data to dataset
+    data[target_vid]['y_filtered'] = est_buffer.tolist()
+    plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered'], label=f'Filter [Q = {Q:.2f}, R = {R:.2f}]', color='red')
     # plot original, noisy and filtered data
     plt.xlabel('Time')
     plt.ylabel('Acceleration')
@@ -85,10 +84,8 @@ def optimizeAccel():
 def testAccel():
 
     plt.figure(figsize=(7, 5))
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='gray')
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations_noisy'], label='Noisy Data', linestyle='dashed')
-    plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='red')
     plt.plot(sensor_data['times'], sensor_data['sensor_accelerations'], label='Noise', color='gray')
+    plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='black')
 
     # plot the different optimized kalman filters
     n = len(sensor_data['times']) # number of data points
@@ -112,7 +109,7 @@ def testAccel():
 
         # # add filtered data to dataset
         data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
-        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', linestyle='dotted')
+        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', color='red')
     # plot original, noisy and filtered data
     plt.xlabel('Time')
     plt.ylabel('Acceleration')
@@ -123,10 +120,8 @@ def testAccel():
 def optimizeVel():
 
     plt.figure(figsize=(7, 5))
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='gray')
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations_noisy'], label='Noisy Data', linestyle='dashed')
-    plt.plot(data[target_vid]['times'], data[target_vid]['velocities'], label='Ground Truth', color='red')
     plt.plot(sensor_data['times'], sensor_data['sensor_velocities'], label='Noise', color='gray')
+    plt.plot(data[target_vid]['times'], data[target_vid]['velocities'], label='Ground Truth', color='black')
 
     # plot the different optimized kalman filters
     n = len(sensor_data['times']) # number of data points
@@ -144,7 +139,7 @@ def optimizeVel():
         
         # # add filtered data to dataset
         data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
-        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [Q = {Q:.2f}, R = {R:.2f}]', linestyle='dotted')
+        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [Q = {Q:.2f}, R = {R:.2f}]', color="red")
     # plot original, noisy and filtered data
     plt.xlabel('Time')
     plt.ylabel('Velocity')
@@ -155,10 +150,8 @@ def optimizeVel():
 def testVel():
 
     plt.figure(figsize=(7, 5))
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations'], label='Ground Truth', color='gray')
-    # plt.plot(data[target_vid]['times'], data[target_vid]['accelerations_noisy'], label='Noisy Data', linestyle='dashed')
-    plt.plot(data[target_vid]['times'], data[target_vid]['velocities'], label='Ground Truth', color='red')
     plt.plot(sensor_data['times'], sensor_data['sensor_velocities'], label='Noise', color='gray')
+    plt.plot(data[target_vid]['times'], data[target_vid]['velocities'], label='Ground Truth', color='black')
 
     # plot the different optimized kalman filters
     n = len(sensor_data['times']) # number of data points
@@ -182,14 +175,15 @@ def testVel():
 
         # add filtered data to dataset
         data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
-        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', linestyle='dotted')
+        plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', color="red")
     # plot original, noisy and filtered data
     plt.xlabel('Time')
     plt.ylabel('Velocity')
     plt.title(f'Original vs Noisy vs Filtered Data')
     plt.legend()
     plt.show()
-optimizeAccel()
+
+testAccel()
 
 '''
 Velocity R / Q Ratios:
