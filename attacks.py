@@ -61,7 +61,7 @@ class Attacks:
             falseMessage.speed = 0
         else:
             falseMessage.speed += falseMessage.acceleration * t
-            falseMessage.posX += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
+            falseMessage.pos_x += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
         plexe.set_fixed_acceleration(claimerID, True, 0)
 
@@ -78,7 +78,7 @@ class Attacks:
             falseMessage.speed = 60
         else:
             falseMessage.speed += falseMessage.acceleration * t
-            falseMessage.posX += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
+            falseMessage.pos_x += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
         plexe.set_fixed_acceleration(claimerID, True, -6)
 
@@ -88,8 +88,8 @@ class Attacks:
         t = (newTime - falseMessage.timestamp)
         falsePositionX = plexe.get_vehicle_data(targetID).__getitem__(POS_X) + 4
         falsePositionY = plexe.get_vehicle_data(targetID).__getitem__(POS_Y)
-        falseMessage.posX = falsePositionX
-        falseMessage.posY = falsePositionY
+        falseMessage.pos_x = falsePositionX
+        falseMessage.pos_y = falsePositionY
         falseMessage.speed  = plexe.get_vehicle_data(targetID).__getitem__(SPEED)
         falseMessage.timestamp = newTime
 
@@ -163,7 +163,7 @@ class Attacks:
                 falseMessage.speed = targetSpeed
             else:
                 falseMessage.speed += falseMessage.acceleration * t
-                falseMessage.posX += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
+                falseMessage.pos_x += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
             falseMessage.timestamp = newTime
             plexe.set_fixed_acceleration(claimerID, True, 10)
             print(plexe.get_vehicle_data(claimerID).__getitem__(ACCELERATION))

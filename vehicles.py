@@ -92,7 +92,7 @@ class Vehicles:
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
 
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
-        print(f"Desired accel: {des_acc}")
+        # print(f"Desired accel: {des_acc}")
         return des_acc
 
     def getSensorData(self, ):

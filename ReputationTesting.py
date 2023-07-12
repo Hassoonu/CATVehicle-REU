@@ -18,6 +18,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
+    
 SIMULATION_SECONDS = 22
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
@@ -157,6 +158,7 @@ def main():
             accel_est, accel_pred = kalmanFilter(accel, R=1, state_est=accel_est, prediction=accel_pred)
             sensor_info.acceleration = accel_est
 
+
             sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
                                                 pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
 
@@ -176,6 +178,7 @@ def main():
                 trust_score.UpdateTrustScore(sensor_info, v2_data, SENSOR_REFRESH / 100)
 
             # check if trust score is too low
+
             #sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
                                             #pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
             if((SENSOR_REFRESH % 100 == 1) or (trust_score.trust < trust_threshold)):
