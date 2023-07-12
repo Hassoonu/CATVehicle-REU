@@ -18,11 +18,13 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 2000
+    
+SIMULATION_SECONDS = 22
+MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 1500
+ATTACK_STEP = 1000
 
 # cruising speed
 velocity = 30
@@ -35,7 +37,7 @@ SENSOR_REFRESH = 10 # centiseconds
 DISTANCE = ACC_HEADWAY * velocity + 2
 
 # falsified message
-false_message = VehicleMessage()
+message = VehicleMessage()
 trust_score = Reputation(0.5)
 trust_threshold = 0.4
 
@@ -144,6 +146,7 @@ def main():
             else:
                 prev_est = estimatedVelocity
             claim_speed_sensor = addNoise(traci.vehicle.getSpeed(CLAIMING_VEHICLE), 0.4)
+
             estimatedVelocity, pred = kalmanFilter(claim_speed_sensor, state_est=estimatedVelocity, prediction=pred)
             sensor_info = vehicles[0].buildMessage()
             v2_data = vehicles[0].buildMessage()
@@ -155,33 +158,34 @@ def main():
             accel_est, accel_pred = kalmanFilter(accel, R=1, state_est=accel_est, prediction=accel_pred)
             sensor_info.acceleration = accel_est
 
+
+            sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
+                                                pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
+
+            false_vehicle_data = VehicleData()
+            message = vehicles[0].buildMessage()
+            vehicles[0].copyDataFromMessage(false_vehicle_data, message)
+
             # start attack
             if step > ATTACK_STEP:
-                attack.falseBrake(plexe, false_message, CLAIMING_VEHICLE)
-
-                false_vehicle_data = VehicleData()
-                false_vehicle_data.pos_x = false_message.pos_x; false_vehicle_data.pos_y = false_message.pos_y; \
-                false_vehicle_data.speed = false_message.speed; false_vehicle_data.acceleration = false_message.acceleration
-
+                attack.notBraking(plexe, message, CLAIMING_VEHICLE)
+                vehicles[0].copyDataFromMessage(false_vehicle_data, message)
                 trust_score.UpdateTrustScore(sensor_info, false_vehicle_data, SENSOR_REFRESH / 100)
+
             else:
                 # sensor info needs to be VehicleData object
-                sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
-                                                pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
                 claim_lane = vehicles[0].getLane()
                 trust_score.UpdateTrustScore(sensor_info, v2_data, SENSOR_REFRESH / 100)
 
             # check if trust score is too low
-            if trust_score.trust < trust_threshold:
-                # ignore message, only use sensor information
-                sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
-                                            pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
-                des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane)
+
+            #sensor_object = VehicleData(acceleration=sensor_info.acceleration, speed=sensor_info.speed, \
+                                            #pos_x=sensor_info.pos_x, pos_y=sensor_info.pos_y)
+            if((SENSOR_REFRESH % 100 == 1) or (trust_score.trust < trust_threshold)):
+                des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane, trust_score.trust)
             else:
-                if step > ATTACK_STEP:
-                    des_acc = vehicles[1].getDesiredAcceleration(false_vehicle_data, claim_lane)
-                else:
-                    des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane)
+                des_acc = vehicles[1].getDesiredAcceleration(false_vehicle_data, claim_lane, trust_score.trust)
+
             vehicles[1].setAcceleration(des_acc)
 
             # graphing info
@@ -215,7 +219,7 @@ def main():
         #     vehicles[0].setAcceleration(6)
         if step == ATTACK_STEP:
             vehicles[0].setAcceleration(0)
-            false_message = vehicles[0].buildMessage()
+            message = vehicles[0].buildMessage()
         step += 1
 
     traci.close()

@@ -16,6 +16,7 @@ class Vehicles:
         add_vehicle(plexe, vehicleID, position, lane, speed)
         self.ID = vehicleID
         self.LANE = lane
+        self.myAcceleration = 0
         self.plexe.set_fixed_lane(vehicleID, 0, safe=False)
         traci.vehicle.setSpeedMode(vehicleID, 0)
         self.plexe.use_controller_acceleration(vehicleID, False)
@@ -23,12 +24,12 @@ class Vehicles:
         self.plexe.set_acc_headway_time(vehicleID, ACC_HEADWAY)
         self.plexe.set_cc_desired_speed(vehicleID, 20)
 
-
-    def getAcceleration(self):
-        pass 
-
     def setAcceleration(self, acceleration):
         self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
+        self.myAcceleration = acceleration
+
+    def getAcceleration(self):
+        return self.myAcceleration
         
 
     def getLane(self):
@@ -36,12 +37,12 @@ class Vehicles:
         return lane
 
     def copyDataFromMessage(self, vehicleObject, message):
-        vehicleObject.pos_x = message.posX
-        vehicleObject.pos_y = message.posY
+        vehicleObject.pos_x = message.pos_x
+        vehicleObject.pos_y = message.pos_y
         vehicleObject.speed = message.speed
         vehicleObject.acceleration = message.acceleration
 
-    def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane):
+    def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane, trustScore):
         
         '''
     :param v1: Verifying Vehicle
@@ -68,10 +69,18 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-
+        trustScore = 0.5
         cruisingVelocity = 30
-        td = 1.2; s0 = 3; v0 = cruisingVelocity; Q = 1; P = 100; K1 = 0.18; K2 = 1.93     # params
-        d1 = self.plexe.get_vehicle_data(self.ID); # get vehicle info
+        timeDelayN = 1.8
+        
+        td = -timeDelayN*trustScore + 3
+        s0 = 3
+        v0 = cruisingVelocity
+        Q = 1
+        P = 100
+        K1 = 0.18
+        K2 = 1.93     # params
+        d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
         
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
