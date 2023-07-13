@@ -11,6 +11,7 @@ from attacks import Attacks
 from reputation import Reputation
 from Sensors import addNoise, kalmanFilter
 from vehicles import Vehicles
+import json
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -18,11 +19,11 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-MAX_STEP = 2000
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 1500
+MAX_STEP = 2500
+ATTACK_STEP = 2000
 
 # cruising speed
 velocity = 30
@@ -68,19 +69,22 @@ def plot_data():
     for vid in vehicle_ids:
         if (vid == CLAIMING_VEHICLE):
             name = "Claimer"
+            color = "black"
         else:
             name = "Verifier"
-        axs[0, 1].plot(data[vid]["times"], data[vid]["velocities"], label=f"{name} Velocity")
-   
+            color = "gray"
+        axs[0, 1].plot(data[vid]["times"], data[vid]["velocities"], label=f"{name} Velocity", color=color)
+    # plot the message information
+    axs[0, 1].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity", linestyle="dashed", color="red")
     axs[0, 1].set_xlabel('Time (s)')
     axs[0, 1].set_ylabel('Speed (m/s)')
     axs[0, 1].set_title('Vehicle Speed')
     axs[0, 1].legend()  # add a legend to distinguish the different vehicles
 
     # plot the velocity sensor information
-    axs[0, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["velocities"], label=f"{name} Velocity")
-    axs[0, 2].plot(sensor_data["times"], sensor_data["sensor_velocities"], label=f"Sensor Velocity")
-    axs[0, 2].plot(sensor_data["times"], sensor_data["filtered_velocities"], label=f"Filtered Velocity")
+    axs[0, 2].plot(sensor_data["times"], sensor_data["sensor_velocities"], label=f"Sensor Velocity", color="gray")
+    axs[0, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["velocities"], label=f"{name} Velocity", color="black")
+    axs[0, 2].plot(sensor_data["times"], sensor_data["filtered_velocities"], label=f"Filtered Velocity", color="red")
     axs[0, 2].set_xlabel('Time (s)')
     axs[0, 2].set_ylabel('Speed (m/s)')
     axs[0, 2].set_title('Sensor Speed')
@@ -92,21 +96,12 @@ def plot_data():
     axs[1, 0].set_ylabel('Trust')
     axs[1, 0].set_title('Trust Score')
 
-    # plot the message information
-    axs[0, 0].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity")
-    # axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel")
-    axs[0, 0].set_xlabel('Time (s)')
-    axs[0, 0].set_ylabel('Message Information')
-    axs[0, 0].set_title('Messages')
-    axs[0, 0].legend()  # add a legend to distinguish the different vehicles
-    axs[0, 0].set_ylim(axs[0, 1].get_ylim())
-
     # plot the acceleration sensor information
-    axs[1, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["accelerations"], label=f"{name} Accel")
-    axs[1, 2].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accel")
-    axs[1, 2].plot(sensor_data["times"], sensor_data["filtered_accelerations"], label=f"Filtered Accel")
+    axs[1, 2].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accel", color="gray")
+    axs[1, 2].plot(data[CLAIMING_VEHICLE]["times"], data[CLAIMING_VEHICLE]["accelerations"], label=f"{name} Accel", color="black")
+    axs[1, 2].plot(sensor_data["times"], sensor_data["filtered_accelerations"], label=f"Filtered Accel", color="red")
     axs[1, 2].set_xlabel('Time (s)')
-    axs[1, 2].set_ylabel('Speed (m/s)')
+    axs[1, 2].set_ylabel('Acceleration (m/s^2)')
     axs[1, 2].set_title('Sensor Acceleration')
     axs[1, 2].legend()  # add a legend to distinguish the different vehicles
     plt.tight_layout()  # adjust the subplot layout to make it more readable
@@ -143,16 +138,17 @@ def main():
                 prev_est = velocity
             else:
                 prev_est = estimatedVelocity
-            claim_speed_sensor = addNoise(traci.vehicle.getSpeed(CLAIMING_VEHICLE), 0.4)
-            estimatedVelocity, pred = kalmanFilter(claim_speed_sensor, state_est=estimatedVelocity, prediction=pred)
+            claim_speed_sensor = addNoise(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
+            Q = 1; R = Q * 0.05
+            estimatedVelocity, pred = kalmanFilter(claim_speed_sensor, R=R, Q=Q, state_est=estimatedVelocity, prediction=pred)
             sensor_info = vehicles[0].buildMessage()
             v2_data = vehicles[0].buildMessage()
 
             # calculate acceleration
             accel = (estimatedVelocity - prev_est) / (SENSOR_REFRESH / 100)
             sensor_info.speed = estimatedVelocity
-
-            accel_est, accel_pred = kalmanFilter(accel, R=1, state_est=accel_est, prediction=accel_pred)
+            Q = 1; R = Q * 24.5
+            accel_est, accel_pred = kalmanFilter(accel, R=R, Q=Q, state_est=accel_est, prediction=accel_pred)
             sensor_info.acceleration = accel_est
 
             # start attack
@@ -203,16 +199,8 @@ def main():
                 sensor_data["message_acceleration"].append(vehicles[0].getAcceleration())
                 sensor_data["message_speed"].append(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
 
-        if step == 200:
-            vehicles[0].setAcceleration(-3)
-        if step == 400:
-            vehicles[0].setAcceleration(6)
-        if step == 1000:
-            vehicles[0].setAcceleration(-1)
-        # if step == 1400:
-        #     vehicles[0].setAcceleration(-6)
-        # if step == 2000:
-        #     vehicles[0].setAcceleration(6)
+        if step % 200 == 1 and step < ATTACK_STEP:
+            vehicles[0].setAcceleration(random.random() * 12 - 6)
         if step == ATTACK_STEP:
             vehicles[0].setAcceleration(0)
             false_message = vehicles[0].buildMessage()
@@ -223,4 +211,7 @@ def main():
 if __name__ == "__main__":
     main()
     plot_data()
-
+    with open(f'sensor_data.json', 'w') as f:
+        json.dump(sensor_data, f)
+    with open(f'vehicle_data.json', 'w') as f:
+        json.dump(data, f)
