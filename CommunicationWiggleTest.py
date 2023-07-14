@@ -44,9 +44,14 @@ class CommunicationWiggleTest:
         
         timeConstant = 0.5
         changeInStep = 0.01
+        desiredAcceleration = 0
+        velocity = 0
+        distanceBetweenCars = 20
+        T= distanceBetweenCars/vehicle2Data.speed
 
-        des_acc = 1
-        return des_acc
+        desiredAcceleration = -(1/T) * (velocityDiff + 
+
+        return desiredAcceleration
 
     def getSensorD(self, ):
         pass
