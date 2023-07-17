@@ -4,11 +4,13 @@ from plexe import ACC, SPEED, ACCELERATION, TIME
 from utils import *
 from Sensors import addNoise, kalmanFilter
 from vehicle_data import VehicleData
+import math
 
 ACC_HEADWAY=1.5
 LENGTH = 4
 velocity = 30
 GracefulDeceleration = 7
+maxDeceleration = 10
 SENSOR_REFRESH = 10
 
 
@@ -36,6 +38,8 @@ class Vehicles:
         self.claim_speed_sensor = 0
         self.accel_est = 0
         self.accel_pred = 0
+        self.timeSinceLastMessage = 0
+        self.MessageTime = 0
 
 
 
@@ -97,7 +101,6 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        trustScore = 0.5
         cruisingVelocity = 100
         timeDelayN = 1.8
         
@@ -127,6 +130,7 @@ class Vehicles:
 
 
     def updateSensorData(self, targetVehicleObject):
+        message = self.getTrueMessage(targetVehicleObject)
         if self.sensorObject.speed == None:
                 self.prev_est = velocity
         else:
@@ -134,7 +138,7 @@ class Vehicles:
 
         self.claim_speed_sensor = addNoise(traci.vehicle.getSpeed(targetVehicleObject.getID()), 0.4)
         
-        self.sensorObject = targetVehicleObject.buildMessage()
+        self.sensorObject = message
         
         self.estimatedVelocity, self.pred = kalmanFilter(self.claim_speed_sensor, state_est=self.estimatedVelocity, prediction=self.pred)
         
@@ -197,39 +201,75 @@ class Vehicles:
         newMessage = VehicleMessage(posX, posY, speed, acceleration, timestamp)
         
         return newMessage
-    
-
-
-
-
 
     def getID(self):
         
         return self.ID
 
+    def sendMessage(self, message, targetOfMessage, creatorOfMessage, vehicleLane, trust, step):
+            #change this to actually send a message
+            targetOfMessage.recieveMessage(creatorOfMessage, message, vehicleLane, trust, step)
 
+    def recieveMessage(self, sender, message, vehicleLane, trust, step):
 
+        self.timeSinceLastMessage = step - self.MessageTime
+        self.MessageTime = step
+        self.getDesiredAcceleration(message, vehicleLane, trust)
 
-
-
-    def sendMessage(self, message, vid):
-        
-        vid.receivedMessage(message)
-
-
-
-
-
-    def receivedMessage(self, message):
-        
-        self.gotAMessage = True
+        if(self.canUpdateSensor(step)):
+            self.updateSensorData(sender)
+            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
+            if(trustworthy):
+                pass
+            else:
+                pass
     
+    def canUpdateSensor(self, step):
+        return True if(step % SENSOR_REFRESH == 1) else False
+        
 
+    def verifyMessageIntegrity(self, message, time_interval):
+        threshold = 1
+        suspicious = False
+        deviation = 0
+        if abs(self.sensorObject.acceleration - message.acceleration) > 2:
+            suspicious = True
+            deviation += abs(self.sensorObject.acceleration - message.acceleration) - 2
+        if abs(self.sensorObject.speed - message.speed) > threshold:
+            suspicious = True
+            deviation += abs(self.sensorObject.speed - message.speed) - threshold
+        
+        self.decay(time_interval)
 
-
-
-    def react(self, message):
-        if(self.gotAMessage):
-            pass
+        self.updateTrustScore(suspicious, deviation)
+    
+    def decay(self, interval):
+        '''
+        Adds exponential time decay based on the length of the intervals between messages
+        '''
+        decay_rate = .001
+        self.trust *= math.exp(-decay_rate * interval)
+        return
+    
+    def getTrueMessage(self, sender):
+        return sender.buildMessage()
+    
+    def increase(self, inc):
+        '''
+        Increases the trust score based on a factor
+        '''
+        increase_factor = .1
+        self.trust += increase_factor * math.log(1 + inc)
+        return
+    
+    def updateTrustScore(self, suspicious, deviation):
+        if suspicious:
+            self.trust -= deviation / 100
         else:
-            pass
+            self.increase(.01)
+        # boundary conditions
+        if self.trust > 1:
+            self.trust = 1
+        elif self.trust < 0:
+            self.trust = 0
+        return
