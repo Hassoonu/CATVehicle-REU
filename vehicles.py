@@ -1,5 +1,6 @@
 import traci
 from vehicle_message import VehicleMessage
+from reputation import Reputation
 from plexe import ACC, SPEED, ACCELERATION, TIME
 from utils import *
 from Sensors import addNoise, kalmanFilter
@@ -15,7 +16,6 @@ SENSOR_REFRESH = 10
 
 
 class Vehicles:
-
 
     def __init__(self, vehicleID, position, lane, speed, plexe):
         self.plexe = plexe
@@ -40,6 +40,7 @@ class Vehicles:
         self.accel_pred = 0
         self.timeSinceLastMessage = 0
         self.MessageTime = 0
+        self.trust = 0
 
     def setAcceleration(self, acceleration):
         self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
@@ -47,7 +48,7 @@ class Vehicles:
 
     def getAcceleration(self):
         return self.myAcceleration
-   
+
     def getLane(self):
         lane = traci.vehicle.getLaneID(self.ID)[-1]
         return lane
@@ -173,12 +174,10 @@ class Vehicles:
         return newMessage
 
     def getID(self):
-        
         return self.ID
 
     def sendMessage(self, message, targetOfMessage, creatorOfMessage, vehicleLane, trust, step):
-            #change this to actually send a message
-            targetOfMessage.recieveMessage(creatorOfMessage, message, vehicleLane, trust, step)
+        targetOfMessage.recieveMessage(creatorOfMessage, message, vehicleLane, trust, step)
 
     def recieveMessage(self, sender, message, vehicleLane, trust, step):
 
@@ -209,7 +208,6 @@ class Vehicles:
             deviation += abs(self.sensorObject.speed - message.speed) - threshold
         
         self.decay(time_interval)
-
         self.updateTrustScore(suspicious, deviation)
     
     def decay(self, interval):
