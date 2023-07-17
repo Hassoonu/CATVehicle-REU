@@ -24,7 +24,7 @@ MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 5
+ATTACK_STEP = 2000
 
 # cruising speed
 velocity = 30
@@ -156,10 +156,10 @@ def main():
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
             
-            #estimatedVelocity = velocity
-            #pred = 0
-            #accel_est = 0
-            #accel_pred = 0
+            estimatedVelocity = velocity
+            pred = 0
+            accel_est = 0
+            accel_pred = 0
 
         if(step % SENSOR_REFRESH == 1):
             # create the sensor readings
@@ -176,19 +176,20 @@ def main():
             # calculate acceleration
             accel = (estimatedVelocity - prev_est) / (SENSOR_REFRESH / 100)
             sensor_info.speed = estimatedVelocity
-            Q = 1; R = Q * 24.5
+            Q = 1; R = Q * 1.12
             accel_est, accel_pred = kalmanFilter(accel, R=R, Q=Q, state_est=accel_est, prediction=accel_pred)
             sensor_info.acceleration = accel_est
 
             # start attack
-            if step > ATTACK_STEP:
-                #attack.falseBrake(plexe, message, CLAIMING_VEHICLE)
-                vehicles[0].copyDataFromMessage(false_vehicle_data, message)
-                vehicles[0].sendMessage(false_vehicle_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
-                           
-            des_acc = vehicles[1].getDesiredAcceleration(false_vehicle_data, claim_lane, trust_score.trust)
+            # if step > ATTACK_STEP:
+            #     #attack.falseBrake(plexe, message, CLAIMING_VEHICLE)
+            claim_lane = vehicles[0].getLane()
+            # message = vehicles[0].getSensorData()
+            # vehicles[0].copyDataFromMessage(v2_data, message)
+            vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
+            des_acc = vehicles[1].getDesiredAcceleration(v2_data, claim_lane, trust_score.trust)
             vehicles[1].setAcceleration(des_acc)
-            #append_data(false_vehicle_data, step)
+            append_data(v2_data, step)
 
         if step % 200 == 1 and step < ATTACK_STEP:
             vehicles[0].setAcceleration(random.random() * 12 - 6)
