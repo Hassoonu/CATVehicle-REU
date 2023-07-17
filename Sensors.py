@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import json, math
 
 # specify standard deviation of the noise
-STANDARD_DEVIATION = 0.4
+STANDARD_DEVIATION = 0.03
 
 # add Gaussian noise to 'y' data
 def addNoise(y, std=STANDARD_DEVIATION):
