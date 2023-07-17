@@ -189,7 +189,7 @@ def main():
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             des_acc = vehicles[1].getDesiredAcceleration(v2_data, claim_lane, trust_score.trust)
             vehicles[1].setAcceleration(des_acc)
-            append_data(v2_data, step)
+            append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
 
         if step % 200 == 1 and step < ATTACK_STEP:
             vehicles[0].setAcceleration(random.random() * 12 - 6)
