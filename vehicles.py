@@ -41,29 +41,16 @@ class Vehicles:
         self.timeSinceLastMessage = 0
         self.MessageTime = 0
 
-
-
-
     def setAcceleration(self, acceleration):
         self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
         self.myAcceleration = acceleration
 
-
-
-
     def getAcceleration(self):
         return self.myAcceleration
-        
-
-
-
-
+   
     def getLane(self):
         lane = traci.vehicle.getLaneID(self.ID)[-1]
         return lane
-
-
-
 
     def copyDataFromMessage(self, vehicleObject, message):
         vehicleObject.pos_x = message.pos_x
@@ -71,11 +58,8 @@ class Vehicles:
         vehicleObject.speed = message.speed
         vehicleObject.acceleration = message.acceleration
 
-
-
-
     def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane, trustScore):
-        
+       
         '''
     :param v1: Verifying Vehicle
     :param v2_data: Attacker False VehicleData object
@@ -112,9 +96,10 @@ class Vehicles:
         K1 = 0.18
         K2 = 1.93     # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
-        
+        v2posx = vehicle2Data.__getitem__("pos_x")
+        d1posx = d1.__getitem__(POS_X)
         if (self.getLane() == vehicle2Lane):
-            s = vehicle2Data.__getitem__(POS_X) - d1.__getitem__(POS_X) - LENGTH # calculate space gap
+            s = v2posx - d1posx - LENGTH # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
@@ -125,9 +110,6 @@ class Vehicles:
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
         #print(f"Desired accel: {des_acc}")
         return des_acc
-
-
-
 
     def updateSensorData(self, targetVehicleObject):
         message = self.getTrueMessage(targetVehicleObject)
@@ -150,9 +132,6 @@ class Vehicles:
         
         self.sensorObject.acceleration = self.accel_est
 
-
-
-
     def getSensorData(self):
         
         accelerationFromSensor=self.sensorObject.acceleration 
@@ -167,22 +146,13 @@ class Vehicles:
         
         return sensorData
 
-
-
-
     def getSensorClaimedSpeed(self):
         
         return self.claim_speed_sensor
 
-
-
-
     def getAccelFromSensor(self):
         
         return self.accel
-
-
-
 
     def buildMessage(self):
         
@@ -225,8 +195,7 @@ class Vehicles:
                 pass
     
     def canUpdateSensor(self, step):
-        return True if(step % SENSOR_REFRESH == 1) else False
-        
+        return True if(step % SENSOR_REFRESH == 1) else False 
 
     def verifyMessageIntegrity(self, message, time_interval):
         threshold = 1
