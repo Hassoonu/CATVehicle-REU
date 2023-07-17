@@ -28,9 +28,6 @@ class Attacks:
         self.time = time
         self.length = length
 
-    def __init__(self, plexe):
-        self.plexe = plexe
-
     def falseBrake(self, plexe, falseMessage, claimerID):
         '''
         Sends message of braking while not physically braking
