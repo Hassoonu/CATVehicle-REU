@@ -11,6 +11,7 @@ from attacks import Attacks
 from reputation import Reputation
 from Sensors import addNoise, kalmanFilter
 from vehicles import Vehicles
+import json
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -77,8 +78,9 @@ def plot_data():
         else:
             name = "Verifier"
             color = "gray"
-        axs[0, 1].plot(data[vid]["times"], data[vid]["velocities"], label=f"{name} Velocity", color = color)
-    # plot the message information:
+
+        axs[0, 1].plot(data[vid]["times"], data[vid]["velocities"], label=f"{name} Velocity", color=color)
+    # plot the message information
     axs[0, 1].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity", linestyle="dashed", color="red")
     axs[0, 1].set_xlabel('Time (s)')
     axs[0, 1].set_ylabel('Speed (m/s)')
@@ -99,15 +101,6 @@ def plot_data():
     axs[1, 0].set_xlabel('Time')
     axs[1, 0].set_ylabel('Trust')
     axs[1, 0].set_title('Trust Score')
-
-    # plot the message information
-    axs[0, 0].plot(sensor_data["times"], sensor_data["message_speed"], label=f"Message Velocity")
-    # axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel")
-    axs[0, 0].set_xlabel('Time (s)')
-    axs[0, 0].set_ylabel('Message Information')
-    axs[0, 0].set_title('Messages')
-    axs[0, 0].legend()  # add a legend to distinguish the different vehicles
-    axs[0, 0].set_ylim(axs[0, 1].get_ylim())
 
     # plot the acceleration sensor information
     axs[1, 2].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accel", color="gray")
@@ -170,33 +163,23 @@ def main():
 
         if(step % SENSOR_REFRESH == 1):
             # create the sensor readings
+            if sensor_info.speed == None:
+                prev_est = velocity
+            else:
+                prev_est = estimatedVelocity
+            claim_speed_sensor = addNoise(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
+            Q = 1; R = Q * 0.05
+            estimatedVelocity, pred = kalmanFilter(claim_speed_sensor, R=R, Q=Q, state_est=estimatedVelocity, prediction=pred)
+            sensor_info = vehicles[0].buildMessage()
             v2_data = vehicles[0].buildMessage()
-            vehicles[1].updateSensorData(vehicles[0])
 
-            sensor_object = vehicles[1].getSensorData()
-            sensorInfoForTrust = VehicleMessage(acceleration = sensor_object.acceleration, speed = sensor_object.speed)
-            
-            claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
-            accel = vehicles[1].getAccelFromSensor()
-            claim_lane = vehicles[0].getLane()
-            trust_score.UpdateTrustScore(sensorInfoForTrust, v2_data, SENSOR_REFRESH / 100)
+            # calculate acceleration
+            accel = (estimatedVelocity - prev_est) / (SENSOR_REFRESH / 100)
+            sensor_info.speed = estimatedVelocity
+            Q = 1; R = Q * 24.5
+            accel_est, accel_pred = kalmanFilter(accel, R=R, Q=Q, state_est=accel_est, prediction=accel_pred)
+            sensor_info.acceleration = accel_est
 
-            des_acc = vehicles[1].getDesiredAcceleration(sensor_object, claim_lane, trust_score.trust)
-            print(f"my trust score: {trust_score.trust}")
-            vehicles[1].setAcceleration(des_acc)
-            false_vehicle_data = VehicleData()
-            message = vehicles[0].buildMessage()
-            vehicles[0].copyDataFromMessage(false_vehicle_data, message)
-            append_data(trust_score, claim_speed_sensor, sensor_info, accel, false_vehicle_data, step)
-            
-        elif (trust_score.trust > trust_threshold and step > 0):  # sensor refresh rate
-            false_vehicle_data = VehicleData()
-            message = vehicles[0].buildMessage()
-
-            vehicles[0].copyDataFromMessage(false_vehicle_data, message)
-
-            claim_lane = vehicles[0].getLane()
-            
             # start attack
             if step > ATTACK_STEP:
                 #attack.falseBrake(plexe, message, CLAIMING_VEHICLE)
@@ -207,21 +190,9 @@ def main():
             vehicles[1].setAcceleration(des_acc)
             #append_data(false_vehicle_data, step)
 
-        if step == 200:
-            vehicles[0].setAcceleration(-3)
-        if step == 400:
-            vehicles[0].setAcceleration(6)
-        if step == 1000:
-            vehicles[0].setAcceleration(-1)
-        if step == 1500:
-            vehicles[0].setAcceleration(1)
-        if step == 2000:
-            vehicles[0].setAcceleration(0)
-        
-        # if step == 1400:
-        #     vehicles[0].setAcceleration(-6)
-        # if step == 2000:
-        #     vehicles[0].setAcceleration(6)
+        if step % 200 == 1 and step < ATTACK_STEP:
+            vehicles[0].setAcceleration(random.random() * 12 - 6)
+
         if step == ATTACK_STEP:
             vehicles[0].setAcceleration(0)
             message = vehicles[0].buildMessage()
@@ -232,3 +203,8 @@ def main():
 if __name__ == "__main__":
     main()
     plot_data()
+    with open(f'sensor_data.json', 'w') as f:
+        json.dump(sensor_data, f)
+    with open(f'vehicle_data.json', 'w') as f:
+        json.dump(data, f)
+
