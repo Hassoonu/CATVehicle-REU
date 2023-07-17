@@ -36,11 +36,9 @@ class Vehicles:
         self.accel_est = 0
         self.accel_pred = 0
         self.claim_speed_sensor = 0
-        self.accel_est = 0
-        self.accel_pred = 0
         self.timeSinceLastMessage = 0
         self.MessageTime = 0
-        self.trust = 0
+        self.trust = 0.5
 
     def setAcceleration(self, acceleration):
         self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
@@ -240,3 +238,6 @@ class Vehicles:
         elif self.trust < 0:
             self.trust = 0
         return
+    
+    def getTrustScore(self):
+        return self.trust
