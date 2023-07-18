@@ -19,7 +19,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 10
+SIMULATION_SECONDS = 5
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
@@ -114,14 +114,15 @@ def plot_data():
     plt.tight_layout()  # adjust the subplot layout to make it more readable
     plt.show()
 
-def append_data(trust, claim_speed_sensor, sensor_info, accel, false_vehicle_data, step):
+
+def append_data(trust_score, claim_speed_sensor, sensor_info, accel, false_vehicle_data, step):
     time = traci.simulation.getTime()
     for vid in vehicle_ids:
         data[vid]["times"].append(time)
         data[vid]["accelerations"].append(traci.vehicle.getAcceleration(vid))
         data[vid]["velocities"].append(traci.vehicle.getSpeed(vid))
     trust_data["times"].append(time)
-    trust_data["trust"].append(trust)
+    trust_data["trust"].append(trust_score.trust)
     sensor_data["times"].append(time)
     sensor_data["sensor_velocities"].append(claim_speed_sensor)
     sensor_data["filtered_velocities"].append(sensor_info.speed)
@@ -164,12 +165,13 @@ def main():
             claim_lane = vehicles[0].getLane()
     
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
+            #des_acc = vehicles[1].getDesiredAcceleration(v2_data, claim_lane, trust_score.trust)
+            #vehicles[1].setAcceleration(des_acc)
+            trust_score.trust = vehicles[1].getTrustScore()
             claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
             accel = vehicles[1].getAccelFromSensor()
-            des_acc = vehicles[1].getDesiredAcceleration(v2_data, claim_lane, trust_score.trust)
-            vehicles[1].setAcceleration(des_acc)
-            trust = vehicles[1].getTrustScore()
-            append_data(trust, claim_speed_sensor, sensor_info, accel, v2_data, step)
+            sensor_info = vehicles[1].getSensorData()
+            append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
 
         step += 1
 

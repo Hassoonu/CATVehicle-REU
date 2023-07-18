@@ -85,8 +85,13 @@ class Vehicles:
         of the forward sensors
     '''
         cruisingVelocity = 100
-        timeDelayN = 1.8
-        td = -timeDelayN*trustScore + 3 #use case switch
+        minTD = 0.5 # min time delay in seconds
+        maxTD = 3 # seconds
+        a = -2.5
+        x1 = 0.81
+        # td = (minTD-maxTD)*trustScore + maxTD #use case switch
+        td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
+        print(f"Time delay: {td:.3f}, Trust score: {trustScore:.3f}")
         s0 = 3
         v0 = cruisingVelocity
         Q = 1
@@ -94,10 +99,6 @@ class Vehicles:
         K1 = 0.18
         K2 = 1.93     # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
-
-        
-
-        print(f"time delay: {td}")
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
@@ -118,17 +119,19 @@ class Vehicles:
         else:
             self.prev_est = self.estimatedVelocity
 
-        self.claim_speed_sensor = addNoise(traci.vehicle.getSpeed(targetVehicleObject.getID()), 0.4)
+        self.claim_speed_sensor = addNoise(traci.vehicle.getSpeed(targetVehicleObject.getID()))
         
         self.sensorObject = message
         
-        self.estimatedVelocity, self.pred = kalmanFilter(self.claim_speed_sensor, state_est=self.estimatedVelocity, prediction=self.pred)
+        Q = 1; R = 0.001
+        self.estimatedVelocity, self.pred = kalmanFilter(self.claim_speed_sensor, state_est=self.estimatedVelocity, prediction=self.pred, Q=Q, R=R)
         
         self.accel = (self.estimatedVelocity - self.prev_est) / (SENSOR_REFRESH / 100)
         
-        self.sensorObject.speed = self.estimatedVelocity
-        
-        self.accel_est, self.accel_pred = kalmanFilter(self.accel, R=1, state_est=self.accel_est, prediction=self.accel_pred)
+        # self.sensorObject.speed = self.estimatedVelocity
+        self.sensorObject.speed = self.claim_speed_sensor
+        Q = 1; R = 1.14 * Q
+        self.accel_est, self.accel_pred = kalmanFilter(self.accel, R=R, Q=Q, state_est=self.accel_est, prediction=self.accel_pred)
         
         self.sensorObject.acceleration = self.accel_est
 
@@ -186,28 +189,26 @@ class Vehicles:
 
         if(self.canUpdateSensor(step)):
             self.updateSensorData(sender)
-            trustworthy = self.verifyMessageIntegrityAndUpdateTrust(message, self.timeSinceLastMessage)
+            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
             if(trustworthy):
                 pass
             else:
-                self.getDesiredAcceleration(self.sensorObject, vehicleLane, self.trust)
+                pass
     
     def canUpdateSensor(self, step):
         return True if(step % SENSOR_REFRESH == 1) else False 
 
-    def verifyMessageIntegrityAndUpdateTrust(self, message, time_interval):
+    def verifyMessageIntegrity(self, message, time_interval):
         threshold = 1
         suspicious = False
         deviation = 0
-        if abs(self.sensorObject.acceleration - message.acceleration) > 2:
+        if abs(self.sensorObject.acceleration - message.acceleration) > (threshold * 2):
             suspicious = True
-            deviation += abs(self.sensorObject.acceleration - message.acceleration) - 2
+            deviation += abs(self.sensorObject.acceleration - message.acceleration) - threshold * 2
         if abs(self.sensorObject.speed - message.speed) > threshold:
             suspicious = True
             deviation += abs(self.sensorObject.speed - message.speed) - threshold
         
-        time_interval /= 100
-        print(f"time interval: {time_interval}")
         self.decay(time_interval)
         self.updateTrustScore(suspicious, deviation)
     
@@ -216,29 +217,19 @@ class Vehicles:
         Adds exponential time decay based on the length of the intervals between messages
         '''
         decay_rate = .0001
-        decayValue = math.exp(-decay_rate * interval)
-        print(f"decay value: {decayValue}")
-        self.trust *= decayValue
+        self.trust *= math.exp(-decay_rate * interval)
         return
     
     def getTrueMessage(self, sender):
         return sender.buildMessage()
     
-    def increase(self, inc):
-        '''
-        Increases the trust score based on a factor
-        '''
-        increase_factor = 0.1
-        trustIncrease = increase_factor * math.log(1 + inc)
-        print(f"trust increase: {trustIncrease}")
-        self.trust += trustIncrease
-        return
     
     def updateTrustScore(self, suspicious, deviation):
-        if suspicious:
+        if suspicious:  # decrease score
             self.trust -= deviation / 100
-        else:
-            self.increase(.01)
+        else:   # increase score
+            increase_factor = .1; inc = 0.01
+            self.trust += increase_factor * math.log(1 + inc)
         # boundary conditions
         if self.trust > 1:
             self.trust = 1
