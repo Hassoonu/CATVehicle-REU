@@ -19,7 +19,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 5
+SIMULATION_SECONDS = 60
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
@@ -50,11 +50,16 @@ trust_threshold = 0.4
 vehicle_ids = [CLAIMING_VEHICLE, VERIFYING_VEHICLE]
 data = {vid: {"times": [], "accelerations": [], "velocities": []} for vid in vehicle_ids}
 sensor_data = {"times": [], "sensor_velocities": [], "filtered_velocities": [], "sensor_accelerations": [], \
-               "filtered_accelerations": [], "message_speed": [], "message_acceleration": []}
+               "filtered_accelerations": [], "message_speed": [], "message_acceleration": [], "dist_between": []}
 trust_data = {"times": [], "trust": []}
 
 def plot_data():
     fig, axs = plt.subplots(2, 3, figsize=(15, 8))
+
+    axs[0, 0].plot(sensor_data["times"], sensor_data["dist_between"], color="black")
+    axs[0, 0].set_xlabel('Time (s)')
+    axs[0, 0].set_ylabel('Distance (m)')
+    axs[0, 0].set_title('Intervehicular Distance')
 
     # plot the acceleration data for each vehicle
     for vid in vehicle_ids:
@@ -64,8 +69,6 @@ def plot_data():
             name = "Verifier"
         axs[1, 1].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Acceleration")
     
-    # axs[0, 0].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accl")
-
     axs[1, 1].set_xlabel('Time (s)')
     axs[1, 1].set_ylabel('Acceleration (m/s^2)')
     axs[1, 1].set_title('Vehicle Acceleration')
@@ -128,6 +131,7 @@ def append_data(trust_score, claim_speed_sensor, sensor_info, accel, false_vehic
     sensor_data["filtered_velocities"].append(sensor_info.speed)
     sensor_data["sensor_accelerations"].append(accel)
     sensor_data["filtered_accelerations"].append(sensor_info.acceleration)
+    sensor_data["dist_between"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
     if step > ATTACK_STEP:
         sensor_data["message_acceleration"].append(false_vehicle_data.acceleration)
         sensor_data["message_speed"].append(false_vehicle_data.speed)
@@ -165,12 +169,12 @@ def main():
             claim_lane = vehicles[0].getLane()
     
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
-            #des_acc = vehicles[1].getDesiredAcceleration(v2_data, claim_lane, trust_score.trust)
-            #vehicles[1].setAcceleration(des_acc)
+
             trust_score.trust = vehicles[1].getTrustScore()
             claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
             accel = vehicles[1].getAccelFromSensor()
             sensor_info = vehicles[1].getSensorData()
+
             append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
 
         step += 1
