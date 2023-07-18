@@ -86,7 +86,6 @@ class Vehicles:
     '''
         cruisingVelocity = 100
         timeDelayN = 1.8
-        
         td = -timeDelayN*trustScore + 3 #use case switch
         s0 = 3
         v0 = cruisingVelocity
@@ -95,10 +94,12 @@ class Vehicles:
         K1 = 0.18
         K2 = 1.93     # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
-        v2posx = vehicle2Data.__getitem__("pos_x")
-        d1posx = d1.__getitem__(POS_X)
+
+        
+
+        print(f"time delay: {td}")
         if (self.getLane() == vehicle2Lane):
-            s = v2posx - d1posx - LENGTH # calculate space gap
+            s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
@@ -185,16 +186,16 @@ class Vehicles:
 
         if(self.canUpdateSensor(step)):
             self.updateSensorData(sender)
-            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
+            trustworthy = self.verifyMessageIntegrityAndUpdateTrust(message, self.timeSinceLastMessage)
             if(trustworthy):
                 pass
             else:
-                pass
+                self.getDesiredAcceleration(self.sensorObject, vehicleLane, self.trust)
     
     def canUpdateSensor(self, step):
         return True if(step % SENSOR_REFRESH == 1) else False 
 
-    def verifyMessageIntegrity(self, message, time_interval):
+    def verifyMessageIntegrityAndUpdateTrust(self, message, time_interval):
         threshold = 1
         suspicious = False
         deviation = 0
@@ -205,6 +206,8 @@ class Vehicles:
             suspicious = True
             deviation += abs(self.sensorObject.speed - message.speed) - threshold
         
+        time_interval /= 100
+        print(f"time interval: {time_interval}")
         self.decay(time_interval)
         self.updateTrustScore(suspicious, deviation)
     
@@ -212,8 +215,10 @@ class Vehicles:
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .001
-        self.trust *= math.exp(-decay_rate * interval)
+        decay_rate = .0001
+        decayValue = math.exp(-decay_rate * interval)
+        print(f"decay value: {decayValue}")
+        self.trust *= decayValue
         return
     
     def getTrueMessage(self, sender):
@@ -223,8 +228,10 @@ class Vehicles:
         '''
         Increases the trust score based on a factor
         '''
-        increase_factor = .1
-        self.trust += increase_factor * math.log(1 + inc)
+        increase_factor = 0.1
+        trustIncrease = increase_factor * math.log(1 + inc)
+        print(f"trust increase: {trustIncrease}")
+        self.trust += trustIncrease
         return
     
     def updateTrustScore(self, suspicious, deviation):
