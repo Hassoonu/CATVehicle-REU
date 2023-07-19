@@ -19,12 +19,12 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 60
+SIMULATION_SECONDS = 20
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 2000
+ATTACK_STEP = 1000
 
 # cruising speed
 velocity = 30
@@ -68,7 +68,7 @@ def plot_data():
         else:
             name = "Verifier"
         axs[1, 1].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Acceleration")
-    
+    axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Acceleration", linestyle="dashed", color="red")
     axs[1, 1].set_xlabel('Time (s)')
     axs[1, 1].set_ylabel('Acceleration (m/s^2)')
     axs[1, 1].set_title('Vehicle Acceleration')
@@ -161,10 +161,8 @@ def main():
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
-            
 
-        if(step % SENSOR_REFRESH == 1):
-            
+        if (step > 0 and step < ATTACK_STEP):
             v2_data = vehicles[0].buildMessage()
             claim_lane = vehicles[0].getLane()
     
@@ -176,7 +174,17 @@ def main():
             sensor_info = vehicles[1].getSensorData()
 
             append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
+        if (step >= ATTACK_STEP):
+            claim_lane = vehicles[0].getLane()
+            attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
+            vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
 
+            trust_score.trust = vehicles[1].getTrustScore()
+            claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
+            accel = vehicles[1].getAccelFromSensor()
+            sensor_info = vehicles[1].getSensorData()
+
+            append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
         step += 1
 
     traci.close()
