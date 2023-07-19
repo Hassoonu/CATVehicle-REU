@@ -1,5 +1,5 @@
 import os
-import random
+import random, numpy
 import sys
 import traci, utils
 from vehicle_message import VehicleMessage
@@ -19,12 +19,12 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 60
+SIMULATION_SECONDS = 20
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 2000
+ATTACK_STEP = 1000
 
 # cruising speed
 velocity = 30
@@ -41,11 +41,6 @@ beginSendingMessages = 100 * 1
 # inter-vehicle distance
 DISTANCE = ACC_HEADWAY * velocity + 2
 
-# falsified message
-message = VehicleMessage()
-trust_score = Reputation(0.5)
-trust_threshold = 0.4
-
 # plotting information
 vehicle_ids = [CLAIMING_VEHICLE, VERIFYING_VEHICLE]
 data = {vid: {"times": [], "accelerations": [], "velocities": []} for vid in vehicle_ids}
@@ -54,7 +49,7 @@ sensor_data = {"times": [], "sensor_velocities": [], "filtered_velocities": [], 
 trust_data = {"times": [], "trust": []}
 
 def plot_data():
-    fig, axs = plt.subplots(2, 3, figsize=(15, 8))
+    fig, axs = plt.subplots(2, 3, figsize=(15, 7))
 
     axs[0, 0].plot(sensor_data["times"], sensor_data["dist_between"], color="black")
     axs[0, 0].set_xlabel('Time (s)')
@@ -65,10 +60,12 @@ def plot_data():
     for vid in vehicle_ids:
         if (vid == CLAIMING_VEHICLE):
             name = "Claimer"
+            color = "black"
         else:
             name = "Verifier"
-        axs[1, 1].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Acceleration")
-    
+            color = "gray"
+        axs[1, 1].plot(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Accel", color = color)
+    axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel", linestyle="dashed", color="red")
     axs[1, 1].set_xlabel('Time (s)')
     axs[1, 1].set_ylabel('Acceleration (m/s^2)')
     axs[1, 1].set_title('Vehicle Acceleration')
@@ -101,7 +98,7 @@ def plot_data():
     axs[0, 2].legend()  # add a legend to distinguish the different vehicles
 
     # plot the trust data
-    axs[1, 0].plot(trust_data["times"], trust_data["trust"], label=f"Trust Score")
+    axs[1, 0].scatter(trust_data["times"], trust_data["trust"], color='black', s=1)
     axs[1, 0].set_xlabel('Time')
     axs[1, 0].set_ylabel('Trust')
     axs[1, 0].set_title('Trust Score')
@@ -118,7 +115,7 @@ def plot_data():
     plt.show()
 
 
-def append_data(trust_score, claim_speed_sensor, sensor_info, accel, false_vehicle_data, step):
+def append_data(trust_score, claim_speed_sensor, sensor_info, accel, message_data, step):
     time = traci.simulation.getTime()
     for vid in vehicle_ids:
         data[vid]["times"].append(time)
@@ -132,12 +129,8 @@ def append_data(trust_score, claim_speed_sensor, sensor_info, accel, false_vehic
     sensor_data["sensor_accelerations"].append(accel)
     sensor_data["filtered_accelerations"].append(sensor_info.acceleration)
     sensor_data["dist_between"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
-    if step > ATTACK_STEP:
-        sensor_data["message_acceleration"].append(false_vehicle_data.acceleration)
-        sensor_data["message_speed"].append(false_vehicle_data.speed)
-    else:
-        sensor_data["message_acceleration"].append(vehicles[0].getAcceleration())
-        sensor_data["message_speed"].append(traci.vehicle.getSpeed(CLAIMING_VEHICLE))
+    sensor_data["message_acceleration"].append(message_data.acceleration)
+    sensor_data["message_speed"].append(message_data.speed)
 
 
 def add_vehicles(plexe, n, real_engine=False):
@@ -161,10 +154,22 @@ def main():
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
-            
 
-        if(step % SENSOR_REFRESH == 1):
-            
+            # for random behaviors
+            behavior_interval = int(numpy.random.normal(300, 100))
+
+        # # Use this for benign scenarios
+        # if (step % behavior_interval == 1):
+        #     vehicles[0].setAcceleration(numpy.random.normal(0, 1.5))
+        #     behavior_interval = int(numpy.random.normal(300, 100))
+
+        # # use this to test a benign rapid braking
+        # if (step > 1000 and step < 1600):
+        #     vehicles[0].setAcceleration(-6)
+        # elif (step == 1600):
+        #     vehicles[0].setAcceleration(3)
+
+        if (step > 0 and step < ATTACK_STEP):
             v2_data = vehicles[0].buildMessage()
             claim_lane = vehicles[0].getLane()
     
@@ -176,7 +181,20 @@ def main():
             sensor_info = vehicles[1].getSensorData()
 
             append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
+        if (step >= ATTACK_STEP):
+            claim_lane = vehicles[0].getLane()
+            attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
+            vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
 
+            trust_score.trust = vehicles[1].getTrustScore()
+            claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
+            accel = vehicles[1].getAccelFromSensor()
+            sensor_info = vehicles[1].getSensorData()
+
+            append_data(trust_score, claim_speed_sensor, sensor_info, accel, v2_data, step)
+        if (plexe.get_crashed(CLAIMING_VEHICLE)):
+            plot_data()
+            traci.close()
         step += 1
 
     traci.close()
