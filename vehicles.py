@@ -13,6 +13,7 @@ velocity = 30
 GracefulDeceleration = 7
 maxDeceleration = 10
 SENSOR_REFRESH = 10
+trustworthy = None
 
 
 class Vehicles:
@@ -46,9 +47,11 @@ class Vehicles:
         self.trust = 0.5
 
     def setAcceleration(self, acceleration):
-        # self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
-        traci.vehicle.setAcceleration(self.ID, acceleration, SENSOR_REFRESH)
-        self.myAcceleration = acceleration
+        if (self.ID == 'v.0'):
+            self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
+        else:
+            traci.vehicle.setAcceleration(self.ID, acceleration, 1)
+        self.myAcceleration = traci.vehicle.getAcceleration(self.ID)
 
     def getAcceleration(self):
         return self.myAcceleration
@@ -100,7 +103,7 @@ class Vehicles:
 
         s0 = 3
         v0 = cruisingVelocity
-        Q = 1
+        Q = 5
         P = 100
         K1 = 0.18
         K2 = 1.93     # params
@@ -111,8 +114,8 @@ class Vehicles:
         else:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
-        # del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
-        del_s = s - s0 - vn * td
+        del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
+        # del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
 
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
@@ -192,17 +195,20 @@ class Vehicles:
     def recieveMessage(self, sender, message, vehicleLane, trust, step):
         self.timeSinceLastMessage = step - self.MessageTime
         self.MessageTime = step
-        des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
-        self.setAcceleration(des_acc)
-
-        if(self.canUpdateSensor(step)):
-            self.updateSensorData(sender)
-            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
+        try:
+            if(self.canUpdateSensor(step)):
+                self.updateSensorData(sender)
+                trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
             if(trustworthy):
-                pass
-            else:
-                pass
-    
+                des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+            else:   # use sensor information instead
+                des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+            self.setAcceleration(des_acc)
+        except UnboundLocalError:
+            trustworthy = True
+            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
+            return
+
     def canUpdateSensor(self, step):
         return True if(step % SENSOR_REFRESH == 1) else False 
 
@@ -219,12 +225,14 @@ class Vehicles:
         
         self.decay(time_interval)
         self.updateTrustScore(suspicious, deviation)
+
+        return False if (self.trust < 0.5) else True
     
     def decay(self, interval):
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .0001
+        decay_rate = .0012
         self.trust *= math.exp(-decay_rate * interval)
         return
     
@@ -233,7 +241,7 @@ class Vehicles:
     
     def updateTrustScore(self, suspicious, deviation):
         if suspicious:  # decrease score
-            self.trust -= deviation / 100
+            self.trust -= deviation / 1000
         else:   # increase score
             increase_factor = .1; inc = 0.01
             self.trust += increase_factor * math.log(1 + inc)
