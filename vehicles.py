@@ -13,6 +13,7 @@ velocity = 30
 GracefulDeceleration = 6
 maxDeceleration = 10
 SENSOR_REFRESH = 10
+trustworthy = None
 
 
 class Vehicles:
