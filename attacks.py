@@ -53,7 +53,7 @@ class Attacks:
         '''
         newTime = plexe.get_vehicle_data(claimerID).__getitem__(TIME)
         t = (newTime - falseMessage.timestamp)
-        falseMessage.acceleration = 6
+        falseMessage.acceleration = 0
         if falseMessage.speed <= 0:
             falseMessage.speed = 60
         else:
@@ -73,7 +73,7 @@ class Attacks:
         falseMessage.speed  = plexe.get_vehicle_data(targetID).__getitem__(SPEED)
         falseMessage.timestamp = newTime
 
-    def falseLaneAttack(self, plexe, claimerID, targetID):
+    def falseLaneAttack(self, plexe, claimerID):
         falseLane = int(traci.vehicle.getLaneID(claimerID)[-1]) + 1
         falseLane = str(falseLane)
         return falseLane

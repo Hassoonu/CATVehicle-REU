@@ -10,7 +10,7 @@ import math
 ACC_HEADWAY=1.5
 LENGTH = 4
 velocity = 30
-GracefulDeceleration = 7
+GracefulDeceleration = 6
 maxDeceleration = 10
 SENSOR_REFRESH = 10
 
@@ -25,10 +25,15 @@ class Vehicles:
         self.myAcceleration = 0
         self.plexe.set_fixed_lane(vehicleID, 0, safe=False)
         traci.vehicle.setSpeedMode(vehicleID, 0)
-        self.plexe.use_controller_acceleration(vehicleID, False)
-        self.plexe.set_active_controller(vehicleID, ACC)
-        self.plexe.set_acc_headway_time(vehicleID, ACC_HEADWAY)
-        self.plexe.set_cc_desired_speed(vehicleID, 20)
+        if (vehicleID == 'v.0'):
+            self.plexe.set_active_controller(vehicleID, ACC)
+            self.plexe.set_acc_headway_time(vehicleID, 0.1)
+            self.plexe.set_cc_desired_speed(vehicleID, 30)
+            self.plexe.use_controller_acceleration(vehicleID, False)
+        # else:
+        #     self.plexe.set_active_controller(vehicleID, ACC)
+        #     self.plexe.set_acc_headway_time(vehicleID, 0.1)
+        #     self.plexe.use_controller_acceleration(vehicleID, False)
         self.gotAMessage = False
         self.sensorObject = VehicleData(speed=None)
         self.estimatedVelocity = velocity
@@ -39,10 +44,25 @@ class Vehicles:
         self.timeSinceLastMessage = 0
         self.MessageTime = 0
         self.trust = 0.5
+        self.trustPenalty = 0
+        self.trustworthy = True
+        self.timeDelay = 0
+        self.desTimeDelay = 0
+        #for testing
+        self.model = 1
+        self.maxDesiredAccelerationOutput = 0
+        self.currentMaxDistanceGap = 0
+        self.currentMinDistanceGap = None
+        self.beginningVelocity = 0
+        self.stopGettingData = False
+
 
     def setAcceleration(self, acceleration):
-        self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
-        self.myAcceleration = acceleration
+        if (self.ID == 'v.0'):
+            self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
+        else:
+            traci.vehicle.setAcceleration(self.ID, acceleration, 1)
+        self.myAcceleration = traci.vehicle.getAcceleration(self.ID)
 
     def getAcceleration(self):
         return self.myAcceleration
@@ -84,35 +104,84 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        cruisingVelocity = 100
-        minTD = 0.5 # min time delay in seconds
+        cruisingVelocity = velocity
+        minTD = 0.7 # min time delay in seconds
         maxTD = 3 # seconds
-        a = -2.5
+        a = -4
         x1 = 0.81
-        # td = (minTD-maxTD)*trustScore + maxTD #use case switch
-        td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
-        print(f"Time delay: {td:.3f}, Trust score: {trustScore:.3f}")
+        self.model = self.getModel()
+        match self.model:
+            case 0:
+                #linear model
+                td = (minTD-maxTD) * trustScore + maxTD
+            case 1:
+                #Exponential Model 1
+                a = 0.00001
+                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+            case 2:
+                #Exponential Model 2
+                a = 5.2
+                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+            case 3:
+                #Cubic Model 1
+                a = 3.3
+                b = 0.5
+                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
+            case 4:
+                #Cubic Model 2
+                a = -6.8
+                b = 0.418
+                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
+            case 5:
+                #Step Model
+                a = 0.65
+                b = 0
+                if (trustScore < a):
+                    b = 0
+                    td = maxTD - (maxTD - minTD)*b
+                elif(trustScore >= a):
+                    b = 1
+                    td = maxTD - (maxTD - minTD)*b
+            case _:
+                td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
+
         s0 = 3
         v0 = cruisingVelocity
-        Q = 1
+        Q = 5
         P = 100
         K1 = 0.18
         K2 = 1.93     # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
+            self.checkMaxDistanceBetween(s)
+            self.checkMinDistanceBetween(s)
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
         del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
+        # del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
-
+            
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
         #print(f"Desired accel: {des_acc}")
+        s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
+        actualDelay = s / traci.vehicle.getSpeed('v.1')
+        self.timeDelay = actualDelay
+
+        #print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+        #print(f"Model being tested is: {self.getModel()}")
+        self.desTimeDelay = td
+        if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
+            self.maxDesiredAccelerationOutput = des_acc
         return des_acc
 
     def updateSensorData(self, targetVehicleObject):
+        '''
+        Moving average for data to prevent large amounts of noise in acceleration
+        Trust penalty response depends on following time, smaller time delay = larger penalty 
+        '''
         message = self.getTrueMessage(targetVehicleObject)
         if self.sensorObject.speed == None:
                 self.prev_est = velocity
@@ -149,12 +218,10 @@ class Vehicles:
         
         return sensorData
 
-    def getSensorClaimedSpeed(self):
-        
+    def getSensorClaimedSpeed(self):  
         return self.claim_speed_sensor
 
-    def getAccelFromSensor(self):
-        
+    def getAccelFromSensor(self):       
         return self.accel
 
     def buildMessage(self):
@@ -182,60 +249,134 @@ class Vehicles:
         targetOfMessage.recieveMessage(creatorOfMessage, message, vehicleLane, trust, step)
 
     def recieveMessage(self, sender, message, vehicleLane, trust, step):
-
         self.timeSinceLastMessage = step - self.MessageTime
         self.MessageTime = step
-        self.getDesiredAcceleration(message, vehicleLane, trust)
-
         if(self.canUpdateSensor(step)):
             self.updateSensorData(sender)
-            trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage)
-            if(trustworthy):
-                pass
-            else:
-                pass
-    
+            self.trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage, sender, vehicleLane)
+        if(self.trustworthy):
+            des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+        else:   # use sensor information instead
+            vehicleLane = self.getTrueLane(sender)
+            des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+            if(self.trust == 0 and abs(des_acc) < 0.05):
+                step = self.getStep()
+                self.endTimer(step, self.stopGettingData)
+                self.stopGettingData = True
+                #pause = input("press key when ready.")
+        self.setAcceleration(des_acc)
+
+# get rid of vehicle lane parameter in most code and replace with "getTrueLane()"
     def canUpdateSensor(self, step):
         return True if(step % SENSOR_REFRESH == 1) else False 
 
-    def verifyMessageIntegrity(self, message, time_interval):
-        threshold = 1
+    def verifyMessageIntegrity(self, message, time_interval, sender, claimedLane):
+        acc_std = 0.412
+        vel_std = 0.03
+        vel_threshold = 3 * vel_std
+        acc_threshold = 2 * acc_std
         suspicious = False
         deviation = 0
-        if abs(self.sensorObject.acceleration - message.acceleration) > (threshold * 2):
+        if abs(self.sensorObject.acceleration - message.acceleration) > acc_threshold:
             suspicious = True
-            deviation += abs(self.sensorObject.acceleration - message.acceleration) - threshold * 2
-        if abs(self.sensorObject.speed - message.speed) > threshold:
+            deviation += abs(self.sensorObject.acceleration - message.acceleration) - acc_threshold
+        if abs(self.sensorObject.speed - message.speed) > vel_threshold:
             suspicious = True
-            deviation += abs(self.sensorObject.speed - message.speed) - threshold
+            deviation += abs(self.sensorObject.speed - message.speed) - vel_threshold
+        if(claimedLane != self.getTrueLane(sender)):
+            suspicious = True
+            deviation += 100 #just a number right now, will update later
         
         self.decay(time_interval)
         self.updateTrustScore(suspicious, deviation)
+
+        return False if (self.trust < 0.5) else True
     
     def decay(self, interval):
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .0001
+        decay_rate = .0011
         self.trust *= math.exp(-decay_rate * interval)
         return
     
     def getTrueMessage(self, sender):
         return sender.buildMessage()
     
+    def getTrueLane(self, sender):
+        return sender.getLane()
     
     def updateTrustScore(self, suspicious, deviation):
-        if suspicious:  # decrease score
-            self.trust -= deviation / 100
+        if (self.trust == 0):
+            pass
+        elif suspicious: # decrease score
+            distanceMultiplier = 10 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
+            self.trust -= (deviation / 1000) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
+            self.trustPenalty += 0.2
         else:   # increase score
-            increase_factor = .1; inc = 0.01
+            increase_factor = .1; inc = 0.011
+            self.trustPenalty = self.trustPenalty/2
             self.trust += increase_factor * math.log(1 + inc)
         # boundary conditions
-        if self.trust > 1:
-            self.trust = 1
+        if self.trust > 0.95:
+            self.trust = 0.95
         elif self.trust < 0:
             self.trust = 0
         return
     
     def getTrustScore(self):
         return self.trust
+    
+    def getTimeDelay(self):
+        return self.timeDelay
+    
+    def getdesTimeDelay(self):
+        return self.desTimeDelay
+    
+
+
+
+    #FOR TESTING
+
+    def getModel(self):
+        return self.model
+
+    def getMaxAcc(self):
+        return self.maxDesiredAccelerationOutput
+    
+    def checkMaxDistanceBetween(self, distanceBetween):
+        if(distanceBetween > self.currentMaxDistanceGap):
+            self.currentMaxDistanceGap = distanceBetween
+
+    def checkMinDistanceBetween(self, distanceBetween):
+        if(self.currentMinDistanceGap == None):
+            self.currentMinDistanceGap = distanceBetween
+        if(distanceBetween < self.currentMinDistanceGap):
+            self.currentMaxDistanceGap = distanceBetween
+
+    def getMaxDistanceBetween(self):
+        return self.currentMaxDistanceGap
+    
+    def getMinDistanceBetween(self):
+        return self.currentMinDistanceGap
+        
+    def initialVelocity(self, velocityInitial):
+        self.beginningVelocity = velocityInitial
+
+    def endTimer(self, step, flag = False):
+        if(flag == False):
+            self.endStep = step
+        else:
+            pass
+
+    def startTimer(self, step):
+        self.beginningStep = step
+
+    def getTimeTillOriginal(self):
+        return((self.endStep - self.beginningStep) / 100)
+    
+    def setStep(self, step):
+        self.step = step
+
+    def getStep(self):
+        return self.step
