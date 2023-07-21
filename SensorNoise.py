@@ -62,7 +62,7 @@ def optimizeAccel():
     n = len(sensor_data['times']) # number of data points
     est_buffer = np.zeros(n)
     data_buffer = np.zeros(n)
-    R = 1; Q = 0.1
+    R = 10; Q = 0.1
     R, Q = optimize_parameters(sensor_data['sensor_accelerations'], data[target_vid]['accelerations'], R, Q)
     print(f"R = {R:.3f}, Q = {Q:.3f}, R / Q = {(R / Q):.3f}")
 
@@ -183,7 +183,9 @@ def testVel():
     plt.legend()
     plt.show()
 
-testAccel()
+# optimizeAccel()
+values = np.array(list(sensor_data["sensor_accelerations"]))
+print(f"standard deviation is: {np.std(values):.3f}")
 
 '''
 Velocity R / Q Ratios:
