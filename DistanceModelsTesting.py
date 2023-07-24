@@ -180,9 +180,9 @@ def main():
             vehicles[1].startTimer(step)
 
         if (step > ATTACK_STEP):
-
-            claim_lane = attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)#vehicles[0].getLane()
-            #attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            v2_data = vehicles[0].buildMessage()
+            claim_lane = vehicles[0].getLane()#attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)
+            attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             trust_score.trust = vehicles[1].getTrustScore()
             append_data(v2_data)

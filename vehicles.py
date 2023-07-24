@@ -145,12 +145,12 @@ class Vehicles:
             case _:
                 td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
 
-        s0 = 3
-        v0 = 35
+        s0 = 3.5
+        v0 = 40
         Q = 5
         P = 100
-        K1 = 0.18
-        K2 = 1.93     # params
+        K1 = 0.18 #0.18
+        K2 = 1.93 #1.93    # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
@@ -159,16 +159,15 @@ class Vehicles:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
 
-        del_s = min(s - s0 - vn *td/2, (v0 - vn) * td)   # calculate spacing error
-        #del_s = s - s0 - vn * td
+        #del_s = min(s - s0 - vn *td, (v0 - vn) * td)   # calculate spacing error
+        del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
-            
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
         #print(f"Desired accel: {des_acc}")
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
-        print(f"vehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
+        #print(f"del_s: {del_s}\nvehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
         actualDelay = s / traci.vehicle.getSpeed('v.1')
-        print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
+        #print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
         self.timeDelay = actualDelay
 
         print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
