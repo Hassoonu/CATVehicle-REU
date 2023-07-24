@@ -159,8 +159,8 @@ class Vehicles:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
 
-        #del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
-        del_s = s - s0 - vn * td
+        del_s = min(s - s0 - vn *td/2, (v0 - vn) * td)   # calculate spacing error
+        #del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
             
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
