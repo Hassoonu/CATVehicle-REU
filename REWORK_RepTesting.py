@@ -24,8 +24,7 @@ MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 1000
-
+ATTACK_STEP = 500
 
 # cruising speed
 velocity = 30
@@ -120,7 +119,6 @@ def plot_data():
     plt.show()
 
 
-
 def append_data(message_data):
     # get information
     trust_score = vehicles[1].getTrustScore()
@@ -169,7 +167,6 @@ def main():
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
 
             # for random behaviors
-
             behavior_interval = 200
 
         # # Use this for benign scenarios
