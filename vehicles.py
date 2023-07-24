@@ -13,7 +13,6 @@ velocity = 30
 GracefulDeceleration = 6
 maxDeceleration = 10
 SENSOR_REFRESH = 10
-trustworthy = None
 
 
 class Vehicles:
@@ -50,12 +49,14 @@ class Vehicles:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 1
+        self.model = 4
         self.maxDesiredAccelerationOutput = 0
         self.currentMaxDistanceGap = 0
         self.currentMinDistanceGap = None
         self.beginningVelocity = 0
         self.stopGettingData = False
+        self.previousVelocities = []
+
 
 
     def setAcceleration(self, acceleration):
@@ -105,12 +106,10 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        cruisingVelocity = velocity
         minTD = 0.7 # min time delay in seconds
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
-        self.model = self.getModel()
         match self.model:
             case 0:
                 #linear model
@@ -147,7 +146,7 @@ class Vehicles:
                 td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
 
         s0 = 3
-        v0 = cruisingVelocity
+        v0 = 35
         Q = 5
         P = 100
         K1 = 0.18
@@ -155,23 +154,24 @@ class Vehicles:
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
-            self.checkMaxDistanceBetween(s)
-            self.checkMinDistanceBetween(s)
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
-            vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds      
-        del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
-        # del_s = s - s0 - vn * td
+            vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
+
+        #del_s = min(s - s0 - vn * td, (v0 - vn) * td)   # calculate spacing error
+        del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
             
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
         #print(f"Desired accel: {des_acc}")
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
+        print(f"vehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
         actualDelay = s / traci.vehicle.getSpeed('v.1')
+        print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
         self.timeDelay = actualDelay
 
-        #print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+        print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
         #print(f"Model being tested is: {self.getModel()}")
         self.desTimeDelay = td
         if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
@@ -260,12 +260,26 @@ class Vehicles:
         else:   # use sensor information instead
             vehicleLane = self.getTrueLane(sender)
             des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-            if(self.trust == 0 and abs(des_acc) < 0.05):
-                step = self.getStep()
-                self.endTimer(step, self.stopGettingData)
-                self.stopGettingData = True
-                #pause = input("press key when ready.")
         self.setAcceleration(des_acc)
+        vehicleLane = self.getTrueLane(sender)
+        desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+        self.collectData(sender, desiredAcceleration)
+
+    def collectData(self, sender, desiredAcceleration):
+        myData = self.buildMessage()
+        self.previousVelocities.append(myData.speed)
+        if(self.trust == 0 and (abs(desiredAcceleration) < 0.05) and  myData.speed - self.previousVelocities[-2] <= 0.1):
+            step = self.getStep()
+            self.endTimer(step, self.stopGettingData)
+            self.stopGettingData = True
+            print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+            #pause = input("press key when ready.")
+        targetInfo = self.getTrueMessage(sender)
+        myInfo = self.plexe.get_vehicle_data(self.ID)
+        distanceBetween = targetInfo.__getitem__("pos_x") - myInfo.__getitem__(POS_X) - LENGTH
+        self.checkMaxDistanceBetween(distanceBetween)
+        self.checkMinDistanceBetween(distanceBetween)
+
 
 # get rid of vehicle lane parameter in most code and replace with "getTrueLane()"
     def canUpdateSensor(self, step):
@@ -286,7 +300,7 @@ class Vehicles:
             deviation += abs(self.sensorObject.speed - message.speed) - vel_threshold
         if(claimedLane != self.getTrueLane(sender)):
             suspicious = True
-            deviation += 100 #just a number right now, will update later
+            deviation += 10 #just a number right now, will update later
         
         self.decay(time_interval)
         self.updateTrustScore(suspicious, deviation)
@@ -353,7 +367,7 @@ class Vehicles:
         if(self.currentMinDistanceGap == None):
             self.currentMinDistanceGap = distanceBetween
         if(distanceBetween < self.currentMinDistanceGap):
-            self.currentMaxDistanceGap = distanceBetween
+            self.currentMinDistanceGap = distanceBetween
 
     def getMaxDistanceBetween(self):
         return self.currentMaxDistanceGap

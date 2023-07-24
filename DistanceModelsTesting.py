@@ -19,7 +19,7 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 60
+SIMULATION_SECONDS = 90
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
@@ -146,7 +146,7 @@ def append_data(message_data):
 
 def add_vehicles(plexe, n, real_engine=False):
     global vehicles
-    vehicles = [Vehicles("v.%d"%i, (n - i + 1) * (DISTANCE + LENGTH), 0, velocity,plexe) for i in range(n)]
+    vehicles = [Vehicles("v.%d"%i, (n - i + 1) * (DISTANCE + LENGTH)*2, 0, velocity,plexe) for i in range(n)]
 
 
 def main():
@@ -169,12 +169,9 @@ def main():
         if (step > 0 and step < ATTACK_STEP):
             v2_data = vehicles[0].buildMessage()
             claim_lane = vehicles[0].getLane()
-    
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
-
             # get info for graphing
             trust_score.trust = vehicles[1].getTrustScore()
-            
             append_data(v2_data)
 
         if(step == (ATTACK_STEP - 1)):
@@ -184,8 +181,8 @@ def main():
 
         if (step > ATTACK_STEP):
 
-            claim_lane = vehicles[0].getLane()
-            attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            claim_lane = attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)#vehicles[0].getLane()
+            #attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             trust_score.trust = vehicles[1].getTrustScore()
             append_data(v2_data)
@@ -197,9 +194,9 @@ def main():
         step += 1
     print(f"The Model that was being tested was Model {vehicles[1].getModel()}")
     print(f"Maximum Acceleration During Simulation: {vehicles[1].getMaxAcc()}")
-    print(f"Minimum Distance Between Vehicles: {vehicles[1].getMinDistanceBetween()}")
     print(f"Maximum Distance Between Vehicles: {vehicles[1].getMaxDistanceBetween()}")
-    #print(f"Time till return to original velocity: {vehicles[1].getTimeTillOriginal()}")
+    print(f"Minimum Distance Between Vehicles: {vehicles[1].getMinDistanceBetween()}")    
+    print(f"Time till return to original velocity: {vehicles[1].getTimeTillOriginal()}")
     traci.close()
 
 if __name__ == "__main__":
