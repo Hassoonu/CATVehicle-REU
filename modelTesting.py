@@ -49,8 +49,9 @@ class modelTesting:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 1
+        self.model = 0
         self.beginningStep = 0
+        self.endStep = 0
         self.step = 0
         self.maxDesiredAccelerationOutput = 0
         self.currentMaxDistanceGap = 0
@@ -109,7 +110,7 @@ class modelTesting:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        minTD = 0.7 # min time delay in seconds
+        minTD = 0.4 # min time delay in seconds
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
@@ -314,7 +315,7 @@ class modelTesting:
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .0011
+        decay_rate = 0.0003
         self.trust *= math.exp(-decay_rate * interval)
         return
     
@@ -336,8 +337,8 @@ class modelTesting:
             self.trustPenalty = self.trustPenalty/2
             self.trust += increase_factor * math.log(1 + inc)
         # boundary conditions
-        if self.trust > 0.95:
-            self.trust = 0.95
+        if self.trust > 1:
+            self.trust = 1
         elif self.trust < 0:
             self.trust = 0
         return

@@ -19,12 +19,13 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
-SIMULATION_SECONDS = 60
+SIMULATION_SECONDS = 120
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 2000
+ATTACK_STEP = 6000
+file_path = 'output.txt'
 
 # cruising speed
 velocity = 30
@@ -143,6 +144,11 @@ def append_data(message_data):
     sensor_data["message_acceleration"].append(message_data.acceleration)
     sensor_data["message_speed"].append(message_data.speed)
 
+def write_array_to_file(file_path, array):
+    with open(file_path, 'a') as file:
+        output_line = ' '.join(str(item) for item in array)
+        file.write(output_line)
+        file.write("\n")
 
 def add_vehicles(plexe, n, real_engine=False):
     global vehicles
@@ -152,6 +158,7 @@ def add_vehicles(plexe, n, real_engine=False):
 
 
 def main():
+    results = []
     start_sumo("cfg/freeway.sumo.cfg", False)
     plexe = Plexe()
     traci.addStepListener(plexe)
@@ -182,8 +189,8 @@ def main():
             vehicles[1].initialVelocity()
 
         if (step > ATTACK_STEP):
-            claim_lane = vehicles[0].getLane()
-            attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
+            claim_lane = vehicles[0].getLane()#attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)
+            attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             trust_score.trust = vehicles[1].getTrustScore()
             append_data(v2_data)
@@ -199,13 +206,20 @@ def main():
     print(f"max distance: {vehicles[1].getMaxDistanceBetween()}")
     print(f"min distance: {vehicles[1].getMinDistanceBetween()}")
     print(f"time accel stabilize: {vehicles[1].getTimeTillStable()}")
+    results.append(vehicles[1].getModel())
+    results.append(vehicles[1].getMaxAcc())
+    results.append(vehicles[1].getMaxDistanceBetween())
+    results.append(vehicles[1].getMinDistanceBetween())
+    results.append(vehicles[1].getTimeTillStable())
+    write_array_to_file(file_path, results)
 
     traci.close()
 
 if __name__ == "__main__":
-    main()
-    plot_data()
-    with open(f'sensor_data.json', 'w') as f:
-        json.dump(sensor_data, f)
-    with open(f'vehicle_data.json', 'w') as f:
-        json.dump(data, f)
+    for i in range(6):
+        main()
+        plot_data()
+        with open(f'sensor_data.json', 'w') as f:
+            json.dump(sensor_data, f)
+        with open(f'vehicle_data.json', 'w') as f:
+            json.dump(data, f)

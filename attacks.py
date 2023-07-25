@@ -53,14 +53,15 @@ class Attacks:
         '''
         newTime = plexe.get_vehicle_data(claimerID).__getitem__(TIME)
         t = (newTime - falseMessage.timestamp)
-        falseMessage.acceleration = 0
+        falseMessage.acceleration = 6
         if falseMessage.speed <= 0:
             falseMessage.speed = 60
         else:
-            falseMessage.speed += falseMessage.acceleration * t
+            falseMessage.speed = 30 #falseMessage.acceleration * t
             falseMessage.pos_x += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
-        plexe.set_fixed_acceleration(claimerID, True, -6)
+        plexe.set_fixed_acceleration(claimerID, True, -8)
+        return falseMessage
 
 
     def teleportationAttack(self, plexe, falseMessage, claimerID, targetID):
