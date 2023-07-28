@@ -10,12 +10,12 @@ import math
 ACC_HEADWAY=1.5
 LENGTH = 4
 velocity = 30
-GracefulDeceleration = 6
+GracefulDeceleration = -6
 maxDeceleration = 10
 SENSOR_REFRESH = 10
 
 
-class Vehicles:
+class modelTesting:
 
     def __init__(self, vehicleID, position, lane, speed, plexe):
         self.plexe = plexe
@@ -49,7 +49,10 @@ class Vehicles:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 4
+        self.model = 1
+        self.beginningStep = 0
+        self.endStep = 0
+        self.step = 0
         self.maxDesiredAccelerationOutput = 0
         self.currentMaxDistanceGap = 0
         self.currentMinDistanceGap = None
@@ -58,6 +61,19 @@ class Vehicles:
         self.previousVelocities = []
 
 
+    def getSafeFollowingTime(self, vel1, vel2, maxAcc1, maxAcc2):
+        '''
+        Vehicle 1: Following Vehicle
+        Vehicle 2: Leading/Claiming Vehicle
+        '''
+        try:
+            d1 = vel1**2 / (2 * maxAcc1)
+            d2 = vel2**2 / (2 * maxAcc2)
+            minimumSpacingGap = d2 - d1
+            minimumTimeDelay = minimumSpacingGap / vel1
+        except ZeroDivisionError:
+            minimumTimeDelay = 1.2
+        return abs(minimumTimeDelay)
 
     def setAcceleration(self, acceleration):
         if (self.ID == 'v.0'):
@@ -106,47 +122,46 @@ class Vehicles:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        minTD = 0.7 # min time delay in seconds
+        minTD = 0.4 # min time delay in seconds
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
-        match self.model:
-            case 0:
-                #linear model
-                td = (minTD-maxTD) * trustScore + maxTD
-            case 1:
-                #Exponential Model 1
-                a = 0.00001
-                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
-            case 2:
-                #Exponential Model 2
-                a = 5.2
-                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
-            case 3:
-                #Cubic Model 1
-                a = 3.3
-                b = 0.5
-                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
-            case 4:
-                #Cubic Model 2
-                a = -6.8
-                b = 0.418
-                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
-            case 5:
-                #Step Model
-                a = 0.65
-                b = 0
-                if (trustScore < a):
-                    b = 0
-                    td = maxTD - (maxTD - minTD)*b
-                elif(trustScore >= a):
-                    b = 1
-                    td = maxTD - (maxTD - minTD)*b
-            case _:
-                td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
-
+        # match self.model:
+        #     case 0:
+        #         #linear model
+        #         td = (minTD-maxTD) * trustScore + maxTD
+        #     case 1:
+        #         #Exponential Model 1
+        #         a = 0.00001
+        #         td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+        #     case 2:
+        #         #Exponential Model 2
+        #         a = 5.2
+        #         td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+        #     case 3:
+        #         #Cubic Model 1
+        #         a = 3.3
+        #         b = 0.5
+        #         td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
+        #     case 4:
+        #         #Cubic Model 2
+        #         a = -6.8
+        #         b = 0.418
+        #         td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
+        #     case 5:
+        #         #Step Model
+        #         a = 0.65
+        #         b = 0
+        #         if (trustScore < a):
+        #             b = 0
+        #             td = maxTD - (maxTD - minTD)*b
+        #         elif(trustScore >= a):
+        #             b = 1
+        #             td = maxTD - (maxTD - minTD)*b
+        #     case _:
+        #         td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
         s0 = 3.5
-        v0 = 40
+        desiredVelocity = 60
         Q = 5
         P = 100
         K1 = 0.18 #0.18
@@ -158,23 +173,24 @@ class Vehicles:
         else:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
+        td = self.getSafeFollowingTime(vn, vn2, GracefulDeceleration, -1 * maxDeceleration)
 
-        #del_s = min(s - s0 - vn *td, (v0 - vn) * td)   # calculate spacing error
-        del_s = s - s0 - vn * td
+        del_s = min(s - s0 - vn *td, (desiredVelocity - vn) * td)   # calculate spacing error
+        #del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
-        #print(f"Desired accel: {des_acc}")
+        
+        print(f"Desired accel: {des_acc:.2f}, Time Delay = {td:.2f}")
+
+        des_acc = max(des_acc, -8)
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
-        #print(f"del_s: {del_s}\nvehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
         actualDelay = s / traci.vehicle.getSpeed('v.1')
-        #print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
         self.timeDelay = actualDelay
 
-        # print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
-        #print(f"Model being tested is: {self.getModel()}")
         self.desTimeDelay = td
         if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
             self.maxDesiredAccelerationOutput = des_acc
+    
         return des_acc
 
     def updateSensorData(self, targetVehicleObject):
@@ -262,16 +278,17 @@ class Vehicles:
         self.setAcceleration(des_acc)
         vehicleLane = self.getTrueLane(sender)
         desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-        self.collectData(sender, desiredAcceleration)
+        self.collectData(sender, desiredAcceleration, step)
 
-    def collectData(self, sender, desiredAcceleration):
+    def collectData(self, sender, desiredAcceleration, step):
         myData = self.buildMessage()
         self.previousVelocities.append(myData.speed)
-        if(self.trust == 0 and (abs(desiredAcceleration) < 0.05) and  myData.speed - self.previousVelocities[-2] <= 0.1):
+        # print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, step: {self.getStep()}, beginningStep: {self.beginningStep}")
+        if(self.trust == 0 and (abs(desiredAcceleration) < 1) and step - self.beginningStep > 50):
             step = self.getStep()
             self.endTimer(step, self.stopGettingData)
             self.stopGettingData = True
-            # print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+            #print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
             #pause = input("press key when ready.")
         targetInfo = self.getTrueMessage(sender)
         myInfo = self.plexe.get_vehicle_data(self.ID)
@@ -310,7 +327,7 @@ class Vehicles:
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .0011
+        decay_rate = 0.0003
         self.trust *= math.exp(-decay_rate * interval)
         return
     
@@ -324,16 +341,16 @@ class Vehicles:
         if (self.trust == 0):
             pass
         elif suspicious: # decrease score
-            distanceMultiplier = 10 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
-            self.trust -= (deviation / 1000) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
+            distanceMultiplier = 100 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
+            self.trust -= (deviation / 100) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
             self.trustPenalty += 0.2
         else:   # increase score
             increase_factor = .1; inc = 0.011
             self.trustPenalty = self.trustPenalty/2
             self.trust += increase_factor * math.log(1 + inc)
         # boundary conditions
-        if self.trust > 0.95:
-            self.trust = 0.95
+        if self.trust > 1:
+            self.trust = 1
         elif self.trust < 0:
             self.trust = 0
         return
@@ -374,7 +391,9 @@ class Vehicles:
     def getMinDistanceBetween(self):
         return self.currentMinDistanceGap
         
-    def initialVelocity(self, velocityInitial):
+    def initialVelocity(self):
+        myInfo = self.buildMessage()
+        velocityInitial = myInfo.speed
         self.beginningVelocity = velocityInitial
 
     def endTimer(self, step, flag = False):
@@ -386,7 +405,7 @@ class Vehicles:
     def startTimer(self, step):
         self.beginningStep = step
 
-    def getTimeTillOriginal(self):
+    def getTimeTillStable(self):
         return((self.endStep - self.beginningStep) / 100)
     
     def setStep(self, step):
