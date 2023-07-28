@@ -33,7 +33,6 @@ class Attacks:
         Sends message of braking while not physically braking
         # claimerID: attacker vehicle
         '''
-        plexe = Plexe()
         newTime = plexe.get_vehicle_data(claimerID).__getitem__(TIME)
         t = (newTime - falseMessage.timestamp)
         falseMessage.acceleration = -6

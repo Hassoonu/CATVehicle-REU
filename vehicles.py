@@ -49,7 +49,8 @@ class Vehicles:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 4
+        self.model = 3
+        self.step = 0
         self.maxDesiredAccelerationOutput = 0
         self.currentMaxDistanceGap = 0
         self.currentMinDistanceGap = None
@@ -110,40 +111,13 @@ class Vehicles:
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
-        match self.model:
-            case 0:
-                #linear model
-                td = (minTD-maxTD) * trustScore + maxTD
-            case 1:
-                #Exponential Model 1
-                a = 0.00001
-                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
-            case 2:
-                #Exponential Model 2
-                a = 5.2
-                td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
-            case 3:
-                #Cubic Model 1
-                a = 3.3
-                b = 0.5
-                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
-            case 4:
-                #Cubic Model 2
-                a = -6.8
-                b = 0.418
-                td = a*(trustScore**3) + (-3*a*b)*(trustScore**2) + (minTD-maxTD-a+3*a*b)*trustScore + maxTD
-            case 5:
-                #Step Model
-                a = 0.65
-                b = 0
-                if (trustScore < a):
-                    b = 0
-                    td = maxTD - (maxTD - minTD)*b
-                elif(trustScore >= a):
-                    b = 1
-                    td = maxTD - (maxTD - minTD)*b
-            case _:
-                td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
+        a = 0.00001
+
+
+        td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+
+        maximumAcceleration = 8
+        findMinTD = 0
 
         s0 = 3.5
         v0 = 40
@@ -222,7 +196,7 @@ class Vehicles:
         return self.claim_speed_sensor
 
     def getAccelFromSensor(self):       
-        return self.accel
+        return self.sensorObject.acceleration 
 
     def buildMessage(self):
         
@@ -249,20 +223,69 @@ class Vehicles:
         targetOfMessage.recieveMessage(creatorOfMessage, message, vehicleLane, trust, step)
 
     def recieveMessage(self, sender, message, vehicleLane, trust, step):
-        self.timeSinceLastMessage = step - self.MessageTime
-        self.MessageTime = step
-        if(self.canUpdateSensor(step)):
-            self.updateSensorData(sender)
-            self.trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage, sender, vehicleLane)
-        if(self.trustworthy):
-            des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
-        else:   # use sensor information instead
-            vehicleLane = self.getTrueLane(sender)
-            des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-        self.setAcceleration(des_acc)
-        vehicleLane = self.getTrueLane(sender)
-        desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-        self.collectData(sender, desiredAcceleration)
+        match self.model:
+            case 0:
+                #only messaging
+                des_acc = self.getDesiredAccelerationNoTrust(message, vehicleLane)
+                self.setAcceleration(des_acc)
+                return
+
+            case 1:
+                #only sensors
+                if(self.canUpdateSensor(step)):
+                    self.updateSensorData(sender)
+                    vehicleLane = self.getTrueLane(sender)
+                    des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+                return
+
+            case 2:
+                #no reputation system, maybe add this, maybe dont?
+                self.timeSinceLastMessage = step - self.MessageTime
+                self.MessageTime = step
+                if(self.canUpdateSensor(step)):
+                    self.updateSensorData(sender)
+                    self.trustworthy = self.verifyMessageIntegrityTOUGH(message, sender, vehicleLane)
+                if(self.trustworthy):
+                    des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+                else:   # use sensor information instead
+                    vehicleLane = self.getTrueLane(sender)
+                    des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+                self.setAcceleration(des_acc)
+                return
+
+            case 3:
+                #our system:
+                self.timeSinceLastMessage = step - self.MessageTime
+                self.MessageTime = step
+                if(self.canUpdateSensor(step)):
+                    self.updateSensorData(sender)
+                    self.trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage, sender, vehicleLane)
+                if(self.trustworthy):
+                    des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+                else:   # use sensor information instead
+                    vehicleLane = self.getTrueLane(sender)
+                    des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+                self.setAcceleration(des_acc)
+                vehicleLane = self.getTrueLane(sender)
+                desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+                self.collectData(sender, desiredAcceleration)
+                return
+        
+        
+        #self.timeSinceLastMessage = step - self.MessageTime
+        #self.MessageTime = step
+        #if(self.canUpdateSensor(step)):
+        #    self.updateSensorData(sender)
+        #    self.trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage, sender, vehicleLane)
+        #if(self.trustworthy):
+        #    des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+        #else:   # use sensor information instead
+        #    vehicleLane = self.getTrueLane(sender)
+        #    des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+        #self.setAcceleration(des_acc)
+        #vehicleLane = self.getTrueLane(sender)
+        #desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
+        #self.collectData(sender, desiredAcceleration)
 
     def collectData(self, sender, desiredAcceleration):
         myData = self.buildMessage()

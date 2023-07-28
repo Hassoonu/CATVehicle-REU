@@ -166,8 +166,9 @@ def main():
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
 
+        vehicles[1].setStep(step)
             # for random behaviors
-            behavior_interval = 200
+        behavior_interval = 200
 
         # # Use this for benign scenarios
         # if (step % behavior_interval == 1 and step < ATTACK_STEP):
@@ -196,7 +197,7 @@ def main():
 
         if (step >= ATTACK_STEP):
             claim_lane = vehicles[0].getLane()
-            attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             trust_score.trust = vehicles[1].getTrustScore()
             append_data(v2_data)

@@ -49,7 +49,7 @@ class modelTesting:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 0
+        self.model = 1
         self.beginningStep = 0
         self.endStep = 0
         self.step = 0
