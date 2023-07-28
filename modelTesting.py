@@ -49,7 +49,7 @@ class modelTesting:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 1
+        self.model = 0
         self.beginningStep = 0
         self.endStep = 0
         self.step = 0
@@ -258,12 +258,15 @@ class modelTesting:
         if(self.canUpdateSensor(step)):
             self.updateSensorData(sender)
             self.trustworthy = self.verifyMessageIntegrity(message, self.timeSinceLastMessage, sender, vehicleLane)
-        if(self.trustworthy):
-            des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
-        else:   # use sensor information instead
             vehicleLane = self.getTrueLane(sender)
             des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-        self.setAcceleration(des_acc)
+            self.setAcceleration(des_acc)
+        if(self.trustworthy):
+            des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
+            self.setAcceleration(des_acc)
+
+        else:   # use sensor information instead
+            pass
         vehicleLane = self.getTrueLane(sender)
         desiredAcceleration = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
         self.collectData(sender, desiredAcceleration, step)
