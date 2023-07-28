@@ -45,7 +45,7 @@ class Attacks:
         plexe.set_fixed_acceleration(claimerID, True, 0)
 
 
-    def notBraking(self, plexe, falseMessage, claimerID):
+    def phantomBraking(self, plexe, falseMessage, claimerID):
         '''
         Sends message of not braking while physically braking
         # claimerID: attacker vehicle
