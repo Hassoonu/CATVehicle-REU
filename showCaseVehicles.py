@@ -49,7 +49,7 @@ class Vehicles:
         self.timeDelay = 0
         self.desTimeDelay = 0
         #for testing
-        self.model = 1
+        self.model = 0
         self.step = 0
         self.maxDesiredAccelerationOutput = 0
         self.currentMaxDistanceGap = 0
@@ -57,6 +57,7 @@ class Vehicles:
         self.beginningVelocity = 0
         self.stopGettingData = False
         self.previousVelocities = []
+        self.endStep = 0
 
 
 
@@ -140,11 +141,14 @@ class Vehicles:
         #print(f"Desired accel: {des_acc}")
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
         #print(f"del_s: {del_s}\nvehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
-        actualDelay = s / traci.vehicle.getSpeed('v.1')
+        vehicleSpeed = traci.vehicle.getSpeed('v.1')
+        if(vehicleSpeed == 0):
+            vehicleSpeed = 0.001
+        actualDelay = s / vehicleSpeed
         #print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
         self.timeDelay = actualDelay
 
-        print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+        #print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
         #print(f"Model being tested is: {self.getModel()}")
         self.desTimeDelay = td
         if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
@@ -180,11 +184,14 @@ class Vehicles:
         #print(f"Desired accel: {des_acc}")
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
         #print(f"del_s: {del_s}\nvehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
-        actualDelay = s / traci.vehicle.getSpeed('v.1')
+        vehicleSpeed = traci.vehicle.getSpeed('v.1')
+        if(vehicleSpeed == 0):
+            vehicleSpeed = 0.001
+        actualDelay = s / vehicleSpeed
         #print(f"vehicle speed: {traci.vehicle.getSpeed('v.1')}\nposition: {s}\nactual delay: {actualDelay}")
         self.timeDelay = actualDelay
 
-        print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+        #print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
         #print(f"Model being tested is: {self.getModel()}")
         self.desTimeDelay = td
         if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
@@ -279,21 +286,6 @@ class Vehicles:
                 return
 
             case 2:
-                #no reputation system, maybe add this, maybe dont?
-                self.timeSinceLastMessage = step - self.MessageTime
-                self.MessageTime = step
-                if(self.canUpdateSensor(step)):
-                    self.updateSensorData(sender)
-                    self.trustworthy = self.verifyMessageIntegrityTOUGH(message, sender, vehicleLane)
-                if(self.trustworthy):
-                    des_acc = self.getDesiredAcceleration(message, vehicleLane, trust)
-                else:   # use sensor information instead
-                    vehicleLane = self.getTrueLane(sender)
-                    des_acc = self.getDesiredAcceleration(self.sensorObject, vehicleLane, trust)
-                self.setAcceleration(des_acc)
-                return
-
-            case 3:
                 #our system:
                 self.timeSinceLastMessage = step - self.MessageTime
                 self.MessageTime = step
@@ -378,7 +370,7 @@ class Vehicles:
         '''
         Adds exponential time decay based on the length of the intervals between messages
         '''
-        decay_rate = .0011
+        decay_rate = 0.0003
         self.trust *= math.exp(-decay_rate * interval)
         return
     
@@ -392,16 +384,16 @@ class Vehicles:
         if (self.trust == 0):
             pass
         elif suspicious: # decrease score
-            distanceMultiplier = 10 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
-            self.trust -= (deviation / 1000) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
+            distanceMultiplier = 100 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
+            self.trust -= (deviation / 100) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
             self.trustPenalty += 0.2
         else:   # increase score
             increase_factor = .1; inc = 0.011
             self.trustPenalty = self.trustPenalty/2
             self.trust += increase_factor * math.log(1 + inc)
         # boundary conditions
-        if self.trust > 0.95:
-            self.trust = 0.95
+        if self.trust > 1:
+            self.trust = 1
         elif self.trust < 0:
             self.trust = 0
         return
@@ -414,11 +406,11 @@ class Vehicles:
     
     def getdesTimeDelay(self):
         return self.desTimeDelay
-    
-
-
 
     #FOR TESTING
+
+    def setModel(self, model):
+        self.model = model
 
     def getModel(self):
         return self.model
@@ -442,7 +434,9 @@ class Vehicles:
     def getMinDistanceBetween(self):
         return self.currentMinDistanceGap
         
-    def initialVelocity(self, velocityInitial):
+    def initialVelocity(self):
+        myInfo = self.buildMessage()
+        velocityInitial = myInfo.speed
         self.beginningVelocity = velocityInitial
 
     def endTimer(self, step, flag = False):
@@ -454,7 +448,7 @@ class Vehicles:
     def startTimer(self, step):
         self.beginningStep = step
 
-    def getTimeTillOriginal(self):
+    def getTimeTillStable(self):
         return((self.endStep - self.beginningStep) / 100)
     
     def setStep(self, step):
