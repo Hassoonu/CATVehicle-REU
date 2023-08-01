@@ -10,7 +10,7 @@ from vehicle_data import VehicleData
 from attacks import Attacks
 from reputation import Reputation
 from Sensors import addNoise, kalmanFilter
-from modelTesting import modelTesting as Vehicles
+from showCaseVehicles import Vehicles
 import json
 
 if 'SUMO_HOME' in os.environ:
@@ -45,22 +45,28 @@ DISTANCE = ACC_HEADWAY * velocity + 2
 # plotting information
 vehicle_ids = [CLAIMING_VEHICLE, VERIFYING_VEHICLE]
 data = {vid: {"times": [], "accelerations": [], "velocities": []} for vid in vehicle_ids}
-sensor_data = {"times": [], "sensor_velocities": [], "filtered_velocities": [], "sensor_accelerations": [], \
+sensor_data = {"times": [], "times0": [], "times1": [], "times2": [], "sensor_velocities": [], "filtered_velocities": [], "sensor_accelerations": [], \
                "filtered_accelerations": [], "message_speed": [], "message_acceleration": [], "time_delay": [], \
-                "des_time_delay": []}
+                "des_time_delay": [], "dist_between0": [], "dist_between1": [], "dist_between2": []}
 trust_data = {"times": [], "trust": []}
 
-def plot_data():
+fig, axs = plt.subplots(2, 3, figsize=(15, 7))
+
+
+def plot_data(i=0):
+    global axs
+    global fig
     #Trust acceleration time graph and distance trust time graph
-    fig, axs = plt.subplots(2, 3, figsize=(15, 7))
     axs2 = axs[1, 1].twinx()
 
-    axs[0, 0].plot(sensor_data["times"], sensor_data["time_delay"], color="black", label="Actual Time Delay")
-    axs[0, 0].plot(sensor_data["times"], sensor_data["des_time_delay"], color="green", label="Desired Time Delay")
+    axs[0, 0].scatter(sensor_data["times"], sensor_data["time_delay"], color="black", label="Actual Time Delay", s=1)
+    axs[0, 0].scatter(sensor_data["times"], sensor_data["des_time_delay"], color="green", label="Desired Time Delay", s=1)
     axs[0, 0].set_xlabel('Simulation Time (s)')
     axs[0, 0].set_ylabel('Delay Time (s)')
     axs[0, 0].set_title('Intervehicular Delay Time')
     axs[0, 0].legend()
+    colors = ["red", "blue", "green", "purple", "yellow"]
+    print(f"MY COLOR IS: {colors[i]}")
 
     # plot the acceleration data for each vehicle
     for vid in vehicle_ids:
@@ -71,16 +77,17 @@ def plot_data():
         else:
             name = "Verifier"
             color = "gray"
-        axs[1, 1].scatter(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Accel", color = color, s=1)
-    axs2.scatter(sensor_data["times"], trust_data["trust"], label=f"Vehicle Trust", color="blue", s=1)
-    axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel", linestyle="dashed", color="red")
+            axs[1, 1].scatter(data[vid]["times"], data[vid]["accelerations"], label=f"{name} Accel", color = color, s=1)
+    axs2.scatter(trust_data["times"], trust_data["trust"], label=f"Vehicle Trust", color="blue", s=1)
+    #axs[1, 1].plot(sensor_data["times"], sensor_data["message_acceleration"], label=f"Message Accel", linestyle="dashed", color="red")
 
     axs[1, 1].set_xlabel('Time (s)')
     axs[1, 1].set_ylabel('Acceleration (m/s^2)')
     axs2.set_ylabel("Trust")
     axs2.set_ylim([0, 1])
     axs[1, 1].set_title('Vehicle Acceleration')
-    axs[1, 1].legend()  # add a legend to distinguish the different vehicles
+    axs[1, 1].legend(loc=0)  # add a legend to distinguish the different vehicles
+    axs2.legend()
 
     # plot the velocity data for each vehicle
     for vid in vehicle_ids:
@@ -110,11 +117,13 @@ def plot_data():
     axs[0, 2].legend()  # add a legend to distinguish the different vehicles
 
     # plot the trust data
-    axs[1, 0].scatter(trust_data["times"], trust_data["trust"], color='black', s=1)
+    axs[1, 0].scatter(sensor_data["times0"], sensor_data["dist_between0"], color = colors[0], s=1)
+    axs[1, 0].scatter(sensor_data["times1"], sensor_data["dist_between1"], color = colors[1], s=1)
+    axs[1, 0].scatter(sensor_data["times2"], sensor_data["dist_between2"], color = colors[2], s=1)
     axs[1, 0].set_xlabel('Time')
-    axs[1, 0].set_ylabel('Trust')
-    axs[1, 0].set_ylim([0, 1])
-    axs[1, 0].set_title('Trust Score')
+    axs[1, 0].set_ylabel("Distance Between Vehicles (m)")
+    axs[1, 0].set_ylim([0, 100])
+    axs[1, 0].legend()
 
     # plot the acceleration sensor information
     axs[1, 2].plot(sensor_data["times"], sensor_data["sensor_accelerations"], label=f"Sensor Accel", color="gray")
@@ -125,10 +134,35 @@ def plot_data():
     axs[1, 2].set_title('Sensor Acceleration')
     axs[1, 2].legend()  # add a legend to distinguish the different vehicles
     plt.tight_layout()  # adjust the subplot layout to make it more readable
+    #plt.show()
+
+def trustOverTimeGraph(i=0):
+    fig, axs = plt.subplots(figsize=(7, 5))
+    global trust_data
+    axs.scatter(trust_data["times"], trust_data["trust"], color='black', s=1, label = "Trust Score")
+    axs.set_xlabel('Time', fontsize = 14)
+    axs.set_ylabel('Trust', fontsize = 14)
+    axs.set_ylim([0, 1])
+    axs.tick_params(axis = 'x', labelsize = 14)
+    axs.tick_params(axis = 'y', labelsize = 14)
+    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=15)
+
+def distanceComparisonGraph():
+    fig, axs = plt.subplots(figsize=(7, 5))
+    global sensor_data
+    colors = ["red", "green", "black"]
+    axs.scatter(sensor_data["times0"], sensor_data["dist_between0"], color = colors[0], s=1, label = "Messaging Only")
+    axs.scatter(sensor_data["times1"], sensor_data["dist_between1"], color = colors[1], s=1, label = "Sensors Only")
+    axs.scatter(sensor_data["times2"], sensor_data["dist_between2"], color = colors[2], s=1, label = "Reputation + Sensors")
+    axs.set_xlabel('Time', fontsize = 14)
+    axs.set_ylabel("Distance Between Vehicles (m)", fontsize = 14)
+    axs.set_ylim([0, 100])
+    axs.tick_params(axis = 'x', labelsize = 14)
+    axs.tick_params(axis = 'y', labelsize = 14)
+    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=15)
     plt.show()
 
-
-def append_data(message_data):
+def append_data(message_data, i):
     # get information
     trust_score = vehicles[1].getTrustScore()
     claim_speed_sensor = vehicles[1].getSensorClaimedSpeed()
@@ -151,6 +185,17 @@ def append_data(message_data):
     sensor_data["des_time_delay"].append(vehicles[1].getdesTimeDelay())
     sensor_data["message_acceleration"].append(message_data.acceleration)
     sensor_data["message_speed"].append(message_data.speed)
+    if i == 0:
+        sensor_data["dist_between0"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
+        sensor_data["times0"].append(time)
+    elif i == 1:
+        sensor_data["dist_between1"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
+        sensor_data["times1"].append(time)
+    else:
+        sensor_data["dist_between2"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
+        sensor_data["times2"].append(time)
+
+
 
 def write_array_to_file(file_path, array):
     with open(file_path, 'a') as file:
@@ -164,8 +209,7 @@ def add_vehicles(plexe, n, real_engine=False):
     for i in range(n):
         print((n - i + 1) * (DISTANCE + LENGTH) * 2)
 
-
-def main():
+def main(i=0):
     results = []
     start_sumo("cfg/freeway.sumo.cfg", False)
     plexe = Plexe()
@@ -182,6 +226,7 @@ def main():
             traci.gui.setZoom("View #0", 45000)
             traci.vehicle.setColor(CLAIMING_VEHICLE, (255,0,0)) 
             traci.vehicle.setColor(VERIFYING_VEHICLE, (255,255,255))
+            vehicles[1].setModel(i)
         vehicles[1].setStep(step)
 
         if (step > 0 and step < ATTACK_STEP):
@@ -190,7 +235,7 @@ def main():
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             # get info for graphing
             trust_score.trust = vehicles[1].getTrustScore()
-            append_data(v2_data)
+            append_data(v2_data, i)
 
         if (step == ATTACK_STEP):
             vehicles[1].startTimer(step)
@@ -198,15 +243,14 @@ def main():
 
         if (step > ATTACK_STEP):
             claim_lane =  vehicles[0].getLane()#attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)#
-            attack.phantomBraking(plexe, v2_data, CLAIMING_VEHICLE)
+            attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
             vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
             trust_score.trust = vehicles[1].getTrustScore()
-            append_data(v2_data)
+            append_data(v2_data, i)
 
         # end the simulation if a crash occurs
         if (plexe.get_crashed(CLAIMING_VEHICLE)):
-            traci.close()
-            return
+            traci.vehicle.setSpeed(VERIFYING_VEHICLE, 0)
         step += 1
     
     print(f"model: {vehicles[1].getModel()}")
@@ -214,6 +258,8 @@ def main():
     print(f"max distance: {vehicles[1].getMaxDistanceBetween()}")
     print(f"min distance: {vehicles[1].getMinDistanceBetween()}")
     print(f"time accel stabilize: {vehicles[1].getTimeTillStable()}")
+    print(f"trust: {vehicles[1].getTrustScore()}")
+
     results.append(vehicles[1].getModel())
     results.append(vehicles[1].getMaxAcc())
     results.append(vehicles[1].getMaxDistanceBetween())
@@ -224,10 +270,12 @@ def main():
     traci.close()
 
 if __name__ == "__main__":
-    #for i in range(6):
-    main()
-    plot_data()
-    with open(f'sensor_data.json', 'w') as f:
-        json.dump(sensor_data, f)
-    with open(f'vehicle_data.json', 'w') as f:
-        json.dump(data, f)
+    for i in range(3):
+        main(i)
+        trustOverTimeGraph(i)
+        trust_data = {"times": [], "trust": []}
+        with open(f'sensor_data.json', 'w') as f:
+            json.dump(sensor_data, f)
+        with open(f'vehicle_data.json', 'w') as f:
+            json.dump(data, f)
+    distanceComparisonGraph()

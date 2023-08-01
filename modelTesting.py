@@ -60,9 +60,6 @@ class modelTesting:
         self.stopGettingData = False
         self.previousVelocities = []
 
-
-
-
     def setAcceleration(self, acceleration):
         if (self.ID == 'v.0'):
             self.plexe.set_fixed_acceleration(self.ID, True, acceleration)
@@ -82,6 +79,21 @@ class modelTesting:
         vehicleObject.pos_y = message.pos_y
         vehicleObject.speed = message.speed
         vehicleObject.acceleration = message.acceleration
+
+
+    def getSafeFollowingTime(self, vel1, vel2, maxAcc1, maxAcc2):
+        '''
+        Vehicle 1: Following Vehicle
+        Vehicle 2: Leading/Claiming Vehicle
+        '''
+        try:
+            d1 = vel1**2 / (2 * maxAcc1)
+            d2 = vel2**2 / (2 * maxAcc2)
+            minimumSpacingGap = d2 - d1
+            minimumTimeDelay = minimumSpacingGap / vel1
+        except ZeroDivisionError:
+            minimumTimeDelay = 1.2
+        return abs(minimumTimeDelay)
 
     def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane, trustScore):
        
@@ -114,6 +126,7 @@ class modelTesting:
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
+        '''
         match self.model:
             case 0:
                 #linear model
@@ -148,7 +161,7 @@ class modelTesting:
                     td = maxTD - (maxTD - minTD)*b
             case _:
                 td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
-
+        '''
         s0 = 3.5
         desiredVelocity = 60
         Q = 5
@@ -156,13 +169,17 @@ class modelTesting:
         K1 = 0.18 #0.18
         K2 = 1.93 #1.93    # params
         d1 = self.plexe.get_vehicle_data(self.ID) # get vehicle info
+        
+
         if (self.getLane() == vehicle2Lane):
             s = vehicle2Data.__getitem__("pos_x") - d1.__getitem__(POS_X) - LENGTH # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = vehicle2Data.__getitem__(SPEED) # vehicle speeds
         else:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
-
+        minTD = self.getSafeFollowingTime(vn, vn2, -1 * GracefulDeceleration, -1 * maxDeceleration)
+        a = 0.00001
+        td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
         del_s = min(s - s0 - vn *td, (desiredVelocity - vn) * td)   # calculate spacing error
         #del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
@@ -175,7 +192,7 @@ class modelTesting:
         self.timeDelay = actualDelay
 
         #print(f"Desired delay: {td:.3f}, Actual delay: {actualDelay:.3f}, Desired accel: {des_acc:.3f}, Trust score: {trustScore:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
-        #print(f"Model being tested is: {self.getModel()}")
+        print(f"MinTD: {minTD}")
         self.desTimeDelay = td
         if(abs(des_acc) > abs(self.maxDesiredAccelerationOutput)):
             self.maxDesiredAccelerationOutput = des_acc
@@ -360,6 +377,9 @@ class modelTesting:
 
     #FOR TESTING
 
+    def setModel(self, model):
+        self.model = model
+        
     def getModel(self):
         return self.model
 
