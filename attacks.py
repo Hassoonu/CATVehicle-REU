@@ -43,6 +43,7 @@ class Attacks:
             falseMessage.pos_x += falseMessage.speed * t + falseMessage.acceleration / 2 * t * t
         falseMessage.timestamp = newTime
         plexe.set_fixed_acceleration(claimerID, True, 0)
+        return falseMessage
 
 
     def phantomBraking(self, plexe, falseMessage, claimerID):
