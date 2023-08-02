@@ -24,7 +24,7 @@ MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 100 * 160
+ATTACK_STEP = 100 * 60
 SCENARIO_STEP = 100 * 160
 file_path = 'output.txt'
 
@@ -139,14 +139,14 @@ def plot_data(i=0):
 def trustOverTimeGraph(i=0):
     fig, axs = plt.subplots(figsize=(9, 7))
     global trust_data
-    axs.scatter(trust_data["times"], trust_data["trust"], color='black', s=1, label = "Trust Score")
+    axs.scatter(trust_data["times"], trust_data["trust"], color='black', s=15, label = "Trust Score")
     axs.set_xlabel('Time (s)', fontsize = 14)
     axs.set_ylabel('Trust', fontsize = 14)
-    #axs.axvline(x=60, color='r', linestyle='--', label='Attack Begins')
+    axs.axvline(x=60, color='r', linestyle='--', label='Attack Begins')
     axs.set_ylim([0, 1])
     axs.tick_params(axis = 'x', labelsize = 14)
     axs.tick_params(axis = 'y', labelsize = 14)
-    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=15)
+    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=3)
 
 def distanceComparisonGraph():
     fig, axs = plt.subplots(figsize=(9, 7))
@@ -250,11 +250,11 @@ def main(i=0):
             # get info for graphing
             trust_score.trust = vehicles[1].getTrustScore()
             append_data(v2_data, i)
-            if (step % behavior_interval == 1 and step < SCENARIO_STEP):
-                vehicles[0].setAcceleration(numpy.random.normal(0, 1.5))
-                behavior_interval = int(numpy.random.normal(500, 100))
-                if behavior_interval == 0:
-                    behavior_interval = 1
+            # if (step % behavior_interval == 1 and step < SCENARIO_STEP):
+            #     vehicles[0].setAcceleration(numpy.random.normal(0, 1.5))
+            #     behavior_interval = int(numpy.random.normal(500, 100))
+            #     if behavior_interval == 0:
+            #         behavior_interval = 1
 
         if (step == ATTACK_STEP):
             vehicles[1].startTimer(step)
@@ -266,7 +266,7 @@ def main(i=0):
             # attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)
             # attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
             # attack.phantomBraking(plexe, v2_data, CLAIMING_VEHICLE)
-        #    attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+           attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
            vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
            trust_score.trust = vehicles[1].getTrustScore()
            append_data(v2_data, i)
@@ -295,7 +295,7 @@ def main(i=0):
     traci.close()
 
 if __name__ == "__main__":
-    for i in range(3):
+    for i in range(2,3):
         random.seed(RANDSEED)
         numpy.random.seed(RANDSEED)
         trust_data = {"times": [], "trust": []}
