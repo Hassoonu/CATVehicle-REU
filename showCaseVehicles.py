@@ -81,39 +81,27 @@ class Vehicles:
         vehicleObject.speed = message.speed
         vehicleObject.acceleration = message.acceleration
 
+    def getSafeFollowingTime(self, vel1, vel2, maxAcc1, maxAcc2):
+        '''
+        Vehicle 1: Following Vehicle
+        Vehicle 2: Leading/Claiming Vehicle
+        '''
+        try:
+            d1 = vel1**2 / (2 * maxAcc1)
+            d2 = vel2**2 / (2 * maxAcc2)
+            minimumSpacingGap = d2 - d1
+            minimumTimeDelay = minimumSpacingGap / vel1
+        except ZeroDivisionError:
+            minimumTimeDelay = 1.2
+        return abs(minimumTimeDelay)
+
     def getDesiredAcceleration(self, vehicle2Data, vehicle2Lane, trustScore):
        
-        '''
-    :param v1: Verifying Vehicle
-    :param v2_data: Attacker False VehicleData object
-
-    un = K1 * s∆ + K2 * ∆v * R(s), if s <= rFRACC
-         K1 * (v0 - vn) * td, if s > rFRACC
-
-    un: desired acceleration
-    s: forward space gap
-    K1, K2: control feedback coefficients
-    rFRACC: detection range of forward sensor
-    ∆v: relative speed wrt the preceding vehicle
-    s∆: spacing error given by:
-    s∆ = min{s - s0 - vn * td, (v0 - vn) * td}
-    s0: minimum space gap between vehicles at standstill
-    td: desired time gap
-    v0: free-flow mode velocity (desired velocity)
-    vn: longitudinal vehicle velocity
-    R(s): space gap-dependent velocity-error response for forward
-        collision avoidance
-    R(s) = 1 - [1 / (1 + Q * e^-(s / P))]
-    Q: aggressiveness coefficient
-    P: perception range coefficient based on detection range
-        of the forward sensors
-    '''
+    
         minTD = 0.7 # min time delay in seconds
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
-        a = 0.00001
-
 
         td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
 
@@ -134,11 +122,14 @@ class Vehicles:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
 
-        #del_s = min(s - s0 - vn *td, (v0 - vn) * td)   # calculate spacing error
+        minTD = self.getSafeFollowingTime(vn, vn2, -1 * GracefulDeceleration, -1 * maxDeceleration)
+        a = 0.00001
+        td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)        
+        
         del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
-        #print(f"Desired accel: {des_acc}")
+        des_acc = max(des_acc, -8)
         s = traci.vehicle.getPosition('v.0')[0] - traci.vehicle.getPosition('v.1')[0] - LENGTH
         #print(f"del_s: {del_s}\nvehicle 0 pos: {traci.vehicle.getPosition('v.0')[0]}\nvehicle 1 pos: {traci.vehicle.getPosition('v.1')[0]}")
         vehicleSpeed = traci.vehicle.getSpeed('v.1')
@@ -312,7 +303,7 @@ class Vehicles:
             step = self.getStep()
             self.endTimer(step, self.stopGettingData)
             self.stopGettingData = True
-            print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
+            # print(f"Desired accel: {desiredAcceleration:.3f}, Trust score: {self.trust:.3f}, flag: {self.stopGettingData}, step: {self.getStep()}, initial velocity: {self.beginningVelocity}, current velocity: {traci.vehicle.getSpeed('v.1')}")
             #pause = input("press key when ready.")
         targetInfo = self.getTrueMessage(sender)
         myInfo = self.plexe.get_vehicle_data(self.ID)
@@ -384,9 +375,11 @@ class Vehicles:
         if (self.trust == 0):
             pass
         elif suspicious: # decrease score
-            distanceMultiplier = 100 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
-            self.trust -= (deviation / 100) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
-            self.trustPenalty += 0.2
+            weight = 0.1
+            self.trust -= weight * deviation * math.exp(self.trustPenalty / self.getTimeDelay())
+            print(f"P = {self.trustPenalty}, Penalty: {weight * deviation * math.exp(self.trustPenalty / self.getTimeDelay())}")
+
+            self.trustPenalty += 2
         else:   # increase score
             increase_factor = .1; inc = 0.011
             self.trustPenalty = self.trustPenalty/2
