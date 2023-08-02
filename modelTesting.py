@@ -122,7 +122,7 @@ class modelTesting:
     P: perception range coefficient based on detection range
         of the forward sensors
     '''
-        minTD = 0.4 # min time delay in seconds
+        minTD = 0.7 # min time delay in seconds
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
@@ -180,8 +180,8 @@ class modelTesting:
         minTD = self.getSafeFollowingTime(vn, vn2, -1 * GracefulDeceleration, -1 * maxDeceleration)
         a = 0.00001
         td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
-        del_s = min(s - s0 - vn *td, (desiredVelocity - vn) * td)   # calculate spacing error
-        #del_s = s - s0 - vn * td
+        #del_s = min(s - s0 - vn *td, (desiredVelocity - vn) * td)   # calculate spacing error
+        del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
         des_acc = K1 * del_s + K2 * (vn2 - vn) * R_s    # finally, calculate desired acceleration
         #print(f"Desired accel: {des_acc}")
