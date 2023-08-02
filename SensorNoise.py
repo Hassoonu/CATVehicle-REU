@@ -46,7 +46,8 @@ def objective(params, *args):
 
 def optimize_parameters(y_noisy, y_original, R_init=1, Q_init=0.1):
     initial_guess = [R_init, Q_init]
-    result = minimize(objective, initial_guess, args=(y_noisy, y_original))
+    bounds = [(0, None), (0, None)]  # lower bound 0, no upper bound
+    result = minimize(objective, initial_guess, args=(y_noisy, y_original), method='L-BFGS-B', bounds=bounds)
     R_opt, Q_opt = result.x
     return R_opt, Q_opt
 
@@ -62,7 +63,7 @@ def optimizeAccel():
     n = len(sensor_data['times']) # number of data points
     est_buffer = np.zeros(n)
     data_buffer = np.zeros(n)
-    R = 10; Q = 0.1
+    R = 1; Q = 0.1
     R, Q = optimize_parameters(sensor_data['sensor_accelerations'], data[target_vid]['accelerations'], R, Q)
     print(f"R = {R:.3f}, Q = {Q:.3f}, R / Q = {(R / Q):.3f}")
 
@@ -73,12 +74,14 @@ def optimizeAccel():
     
     # # add filtered data to dataset
     data[target_vid]['y_filtered'] = est_buffer.tolist()
-    plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered'], label=f'Filter [Q = {Q:.2f}, R = {R:.2f}]', color='red')
+    plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered'], label=f'Filter', color='red')
     # plot original, noisy and filtered data
-    plt.xlabel('Time')
-    plt.ylabel('Acceleration')
-    plt.title(f'Original vs Noisy vs Filtered Data')
-    plt.legend()
+    plt.xlabel('Time (s)', fontsize=15)
+    plt.ylabel('Acceleration (m/s^2)', fontsize=15)
+    plt.xticks(fontsize=14) 
+    plt.yticks(fontsize=14) 
+    # plt.title(f'Original vs Noisy vs Filtered Data')
+    plt.legend(fontsize=14)
     plt.show()
 
 def testAccel():
@@ -111,8 +114,8 @@ def testAccel():
         data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
         plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', color='red')
     # plot original, noisy and filtered data
-    plt.xlabel('Time')
-    plt.ylabel('Acceleration')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Acceleration (m/s^2)')
     plt.title(f'Original vs Noisy vs Filtered Data')
     plt.legend()
     plt.show()
@@ -177,13 +180,13 @@ def testVel():
         data[target_vid]['y_filtered' + str(iteration)] = est_buffer.tolist()
         plt.plot(data[target_vid]['times'], data[target_vid]['y_filtered' + str(iteration)], label=f'Filter [R / Q: {(R / Q):.3f}]', color="red")
     # plot original, noisy and filtered data
-    plt.xlabel('Time')
-    plt.ylabel('Velocity')
+    plt.xlabel('Time', fontsize=15)
+    plt.ylabel('Velocity', fontsize=15)
     plt.title(f'Original vs Noisy vs Filtered Data')
     plt.legend()
     plt.show()
 
-# optimizeAccel()
+optimizeAccel()
 values = np.array(list(sensor_data["sensor_accelerations"]))
 print(f"standard deviation is: {np.std(values):.3f}")
 
