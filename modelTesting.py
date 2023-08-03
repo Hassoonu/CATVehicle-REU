@@ -126,7 +126,7 @@ class modelTesting:
         maxTD = 3 # seconds
         a = -4
         x1 = 0.81
-        
+        '''
         match self.model:
             case 0:
                 #linear model
@@ -161,7 +161,7 @@ class modelTesting:
                     td = maxTD - (maxTD - minTD)*b
             case _:
                 td = a*math.pow(trustScore, 3) - 3*a*x1*math.pow(trustScore, 2) + (minTD - maxTD - a + 3*a*x1) * trustScore + maxTD
-        
+        '''
         s0 = 3.5
         desiredVelocity = 60
         Q = 5
@@ -178,8 +178,8 @@ class modelTesting:
             s = 100 # calculate space gap
             vn = d1.__getitem__(SPEED); vn2 = velocity # vehicle speeds    
         minTD = self.getSafeFollowingTime(vn, vn2, -1 * GracefulDeceleration, -1 * maxDeceleration)
-        #a = 0.00001
-        #td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
+        a = 0.00001
+        td = ((maxTD-minTD)*a**(-trustScore + 1) + a*minTD - maxTD) / (a - 1)
         #del_s = min(s - s0 - vn *td, (desiredVelocity - vn) * td)   # calculate spacing error
         del_s = s - s0 - vn * td
         R_s = 1 - (1 / (1 + Q * math.pow(math.e, -1 * (s / P))))    # calculate error response for collision avoidance
@@ -349,8 +349,10 @@ class modelTesting:
         if (self.trust == 0):
             pass
         elif suspicious: # decrease score
-            distanceMultiplier = 100 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
-            self.trust -= (deviation / 100) * math.pow(math.e, self.trustPenalty) * distanceMultiplier
+            weight = 1
+            # distanceMultiplier = 100 * math.exp(1.0/self.getTimeDelay()) #PRONE TO CHANGE
+            # self.trust -= (deviation / 100) * math.pow(math.e, self.trustPenalty) * distanceMultiplier     
+            self.trust -= weight * deviation * math.exp(self.trustPenalty / self.getTimeDelay())
             self.trustPenalty += 0.2
         else:   # increase score
             increase_factor = .1; inc = 0.011

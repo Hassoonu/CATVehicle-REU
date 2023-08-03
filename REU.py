@@ -39,7 +39,7 @@ from plexe import Plexe, DRIVER, ACC, CACC, RPM, GEAR, RADAR_REL_SPEED, SPEED, R
 # vehicle length
 LENGTH = 4
 # inter-vehicle distance
-DISTANCE = 5
+# DISTANCE = 5
 
 # cruising speed
 velocity = 30
@@ -49,7 +49,7 @@ HEADWAY_DISTANCE=ACC_HEADWAY * velocity
 
 # inter-vehicle distance
 
-#DISTANCE = ACC_HEADWAY * velocity + 2
+DISTANCE = ACC_HEADWAY * velocity + 2
 
 # sinusoid frequency
 FREQ = 0.2
