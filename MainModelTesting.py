@@ -18,14 +18,15 @@ if 'SUMO_HOME' in os.environ:
     sys.path.append(tools)
 else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
-RANDSEED = 3
+RANDSEED = 2
 SIMULATION_SECONDS = 120
 MAX_STEP = 100 * SIMULATION_SECONDS
 CLAIMING_VEHICLE = 'v.0'
 VERIFYING_VEHICLE = 'v.1'
 attack = Attacks()
-ATTACK_STEP = 100 * 120
+ATTACK_STEP = 100 * 160
 SCENARIO_STEP = 100 * 160
+FONTSIZE = 24
 file_path = 'output.txt'
 
 # cruising speed
@@ -48,7 +49,7 @@ vehicle_ids = [CLAIMING_VEHICLE, VERIFYING_VEHICLE]
 data = {vid: {"times": [], "accelerations": [], "velocities": []} for vid in vehicle_ids}
 sensor_data = {"times": [], "times0": [], "times1": [], "times2": [], "sensor_velocities": [], "filtered_velocities": [], "sensor_accelerations": [], \
                "filtered_accelerations": [], "message_speed": [], "message_acceleration": [], "time_delay": [], \
-                "des_time_delay": [], "dist_between0": [], "dist_between1": [], "dist_between2": [], "timeDelay0": [], "timeDelay1": [], "timeDelay2": []}
+                "des_time_delay": [], "dist_between0": [], "dist_between1": [], "dist_between2": []}
 trust_data = {"times": [], "trust": []}
 
 # fig, axs = plt.subplots(2, 3, figsize=(15, 7))
@@ -139,29 +140,56 @@ def plot_data(i=0):
 def trustOverTimeGraph(i=0):
     fig, axs = plt.subplots(figsize=(9, 7))
     global trust_data
-    axs.scatter(trust_data["times"], trust_data["trust"], color='black', s=15, label = "Trust Score")
-    axs.set_xlabel('Time (s)', fontsize = 14)
-    axs.set_ylabel('Trust', fontsize = 14)
-    axs.axvline(x=60, color='r', linestyle='--', label='Attack Begins')
-    axs.set_ylim([0, 1])
-    axs.tick_params(axis = 'x', labelsize = 14)
-    axs.tick_params(axis = 'y', labelsize = 14)
-    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=3)
+    axs.scatter(trust_data["times"], trust_data["trust"], color='#DBE2EB', s=15, label = "Trust Score")
+    axs.set_xlabel('Time (s)', fontsize = FONTSIZE)
+    axs.set_ylabel('Trust', fontsize = FONTSIZE)
+    axs.set_facecolor("#3C4F67")
+    axs.tick_params(colors='white')
+    axs.xaxis.label.set_color('white')
+    axs.yaxis.label.set_color('white')
+    axs.spines['bottom'].set_color('white')
+    axs.spines['top'].set_color('white')
+    axs.spines['left'].set_color('white')
+    axs.spines['right'].set_color('white')
+    axs.set_title("Trust Score Over Time", color='white', fontsize=FONTSIZE)
 
-def timeDelayComparisonGraph():
+    if ATTACK_STEP < 120:
+        axs.axvline(x=ATTACK_STEP / 100, color='r', linestyle='--', label='Attack Begins')
+    axs.set_ylim([0, 1])
+    axs.tick_params(axis = 'x', labelsize = FONTSIZE)
+    axs.tick_params(axis = 'y', labelsize = FONTSIZE)
+    legend = axs.legend(loc = 0, fontsize = FONTSIZE, scatterpoints=1, markerscale=3, facecolor='#393939')
+    for text in legend.get_texts():
+        text.set_color('white')
+    plt.savefig("/Users/kylemack/Downloads/SIMULATION_DATA/Trust.png", transparent = True)
+
+def distanceComparisonGraph():
     fig, axs = plt.subplots(figsize=(9, 7))
     global sensor_data
-    colors = ["red", "green", "black"]
-    axs.scatter(sensor_data["times0"], sensor_data["timeDelay0"], color = colors[0], s=1, label = "Messaging Only")
-    axs.scatter(sensor_data["times1"], sensor_data["timeDelay1"], color = colors[1], s=1, label = "Sensors Only")
-    axs.scatter(sensor_data["times2"], sensor_data["timeDelay2"], color = colors[2], s=1, label = "Reputation + Sensors")
-    axs.axvline(x=60, color='r', linestyle='--', label='Attack Begins')
-    axs.set_xlabel('Time (s)', fontsize = 14)
-    axs.set_ylabel("Time Delay Between Vehicles (m)", fontsize = 14)
-    axs.set_ylim([0, 10])
-    axs.tick_params(axis = 'x', labelsize = 14)
-    axs.tick_params(axis = 'y', labelsize = 14)
-    axs.legend(loc = 0, fontsize = 14, scatterpoints=1, markerscale=15)
+    colors = ["#84BF40", "#FCB900", "#DBE2EB"]
+    axs.scatter(sensor_data["times0"], sensor_data["dist_between0"], color = colors[0], s=1, label = "Messaging Only")
+    axs.scatter(sensor_data["times1"], sensor_data["dist_between1"], color = colors[1], s=1, label = "Sensors Only")
+    axs.scatter(sensor_data["times2"], sensor_data["dist_between2"], color = colors[2], s=1, label = "Reputation + Sensors")
+    if ATTACK_STEP < 120:
+        axs.axvline(x=ATTACK_STEP / 100, color='r', linestyle='--', label='Attack Begins')
+    axs.set_facecolor("#3C4F67")
+    axs.tick_params(colors='white')
+    axs.xaxis.label.set_color('white')
+    axs.yaxis.label.set_color('white')
+    axs.spines['bottom'].set_color('white')
+    axs.spines['top'].set_color('white')
+    axs.spines['left'].set_color('white')
+    axs.spines['right'].set_color('white')
+    axs.set_title("Distance Between Vehicles Over Time", color='white', fontsize=FONTSIZE)
+    axs.set_xlabel('Time (s)', fontsize = FONTSIZE)
+    axs.set_ylabel("Distance Between Vehicles (m)", fontsize = FONTSIZE)
+    axs.set_ylim([0, 125])
+    axs.tick_params(axis = 'x', labelsize = FONTSIZE)
+    axs.tick_params(axis = 'y', labelsize = FONTSIZE)
+    legend = axs.legend(loc = 0, fontsize = FONTSIZE, scatterpoints=1, markerscale=15, facecolor='#393939')
+    for text in legend.get_texts():
+        text.set_color('white')
+    plt.savefig("/Users/kylemack/Downloads/SIMULATION_DATA/Dist.png", transparent = True)    
     plt.show()
 
 def accelerationPlotGraph(i =0):
@@ -201,13 +229,13 @@ def append_data(message_data, i):
     sensor_data["message_acceleration"].append(message_data.acceleration)
     sensor_data["message_speed"].append(message_data.speed)
     if i == 0:
-        sensor_data["timeDelay0"].append(vehicles[1].getTimeDelay())
+        sensor_data["dist_between0"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
         sensor_data["times0"].append(time)
     elif i == 1:
-        sensor_data["timeDelay1"].append(vehicles[1].getTimeDelay())
+        sensor_data["dist_between1"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
         sensor_data["times1"].append(time)
     else:
-        sensor_data["timeDelay2"].append(vehicles[1].getTimeDelay())
+        sensor_data["dist_between2"].append(traci.vehicle.getPosition(CLAIMING_VEHICLE)[0] - traci.vehicle.getPosition(VERIFYING_VEHICLE)[0])
         sensor_data["times2"].append(time)
 
 def write_array_to_file(file_path, array):
@@ -261,15 +289,15 @@ def main(i=0):
             vehicles[1].initialVelocity()
 
         if (step > ATTACK_STEP):
-           v2_data = vehicles[0].buildMessage()
-           claim_lane = vehicles[0].getLane()#attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)#
-           # attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)
-           #attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
-           #attack.phantomBraking(plexe, v2_data, CLAIMING_VEHICLE)
-           attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
-           vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
-           trust_score.trust = vehicles[1].getTrustScore()
-           append_data(v2_data, i)
+            v2_data = vehicles[0].buildMessage()
+            claim_lane = vehicles[0].getLane()
+            # attack.falseLaneAttack(plexe, CLAIMING_VEHICLE)
+            # attack.falseBrake(plexe, v2_data, CLAIMING_VEHICLE)
+            # attack.phantomBraking(plexe, v2_data, CLAIMING_VEHICLE)
+            # attack.teleportationAttack(plexe, v2_data, CLAIMING_VEHICLE, VERIFYING_VEHICLE)
+            vehicles[0].sendMessage(v2_data, vehicles[1], vehicles[0], claim_lane, trust_score.trust, step)
+            trust_score.trust = vehicles[1].getTrustScore()
+            append_data(v2_data, i)
 
         # end the simulation if a crash occurs
         if (plexe.get_crashed(CLAIMING_VEHICLE)):
@@ -308,4 +336,5 @@ if __name__ == "__main__":
             json.dump(sensor_data, f)
         with open(f'vehicle_data.json', 'w') as f:
             json.dump(data, f)
-    timeDelayComparisonGraph()
+    
+    distanceComparisonGraph()
